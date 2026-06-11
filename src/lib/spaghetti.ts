@@ -38,6 +38,56 @@ export function computeRouteMetrics(
     minutesPerShift: profile.speedMps > 0 ? metersPerShift / profile.speedMps / 60 : 0,
     costPerShift,
     costPerYear: costPerShift * shiftsPerDay * daysPerYear,
+    linkedNodeId: route.linkedNodeId,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// VSM ↔ spaghetti transport audit
+// ---------------------------------------------------------------------------
+
+export interface TransportAuditRow {
+  routeId: string
+  routeName: string
+  nodeId: string
+  mode: TransportMode
+  /** Conveyance seconds each produced part carries on this route. */
+  secondsPerPart: number
+  costPerPart: number
+}
+
+export interface TransportAudit {
+  rows: TransportAuditRow[]
+  totalSecondsPerPart: number
+  totalCostPerPart: number
+}
+
+/**
+ * For every route linked to a VSM station, allocate its travel time and cost
+ * over the parts produced per shift — transport waste expressed per part,
+ * directly comparable to a station's cycle time.
+ */
+export function computeTransportAudit(state: SpaghettiState, partsPerShift: number): TransportAudit {
+  const rows: TransportAuditRow[] = []
+  if (partsPerShift > 0) {
+    for (const route of state.routes) {
+      if (!route.linkedNodeId) continue
+      const profile = TRANSPORT_PROFILES[route.mode]
+      const metersPerShift = polylineLength(route.points) * state.metersPerUnit * 2 * Math.max(0, route.tripsPerShift)
+      rows.push({
+        routeId: route.id,
+        routeName: route.name,
+        nodeId: route.linkedNodeId,
+        mode: route.mode,
+        secondsPerPart: metersPerShift / profile.speedMps / partsPerShift,
+        costPerPart: (metersPerShift * profile.costPerMeter) / partsPerShift,
+      })
+    }
+  }
+  return {
+    rows,
+    totalSecondsPerPart: rows.reduce((s, r) => s + r.secondsPerPart, 0),
+    totalCostPerPart: rows.reduce((s, r) => s + r.costPerPart, 0),
   }
 }
 

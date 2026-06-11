@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Activity, BarChart3, Download, FilePlus2, FlaskConical, FolderOpen, Map as MapIcon,
+  Activity, BarChart3, BookOpen, Download, FilePlus2, FlaskConical, FolderOpen, Map as MapIcon,
   Redo2, Undo2, Waypoints,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useApp, type AppTab } from './store'
 import { computeSystemMetrics, fmtSeconds } from './lib/analytics'
 import {
-  exportMetricsCsv, exportPng, exportProjectJson, exportSpaghettiCsv, exportSvg,
+  exportBenchmarksCsv, exportMetricsCsv, exportPng, exportProjectJson, exportSpaghettiCsv, exportSvg,
 } from './lib/exporters'
-import { computeSpaghettiSummary } from './lib/spaghetti'
+import { computeBenchmarks, overallGrade } from './lib/benchmarks'
+import { generateKaizenSuggestions } from './lib/copilot'
+import { exportHtmlReport } from './lib/report'
+import { computeSpaghettiSummary, computeTransportAudit } from './lib/spaghetti'
 import { SHEET } from './lib/geometry'
 import { VsmCanvas } from './components/vsm/Canvas'
 import { Toolbox } from './components/vsm/Toolbox'
@@ -17,6 +20,7 @@ import { Inspector } from './components/vsm/Inspector'
 import { SpaghettiStudio, FLOOR } from './components/spaghetti/SpaghettiStudio'
 import { AnalyticsView } from './components/analytics/AnalyticsView'
 import { BenchmarkView } from './components/benchmarks/BenchmarkView'
+import { HelpModal } from './components/HelpModal'
 
 const TABS: { id: AppTab; label: string; icon: typeof Waypoints }[] = [
   { id: 'vsm', label: 'VSM Studio', icon: Waypoints },
@@ -112,15 +116,33 @@ function TopBar({
   const projectName = useApp((s) => s.projectName)
   const setProjectName = useApp((s) => s.setProjectName)
   const [exportOpen, setExportOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const doExport = (what: 'json' | 'csv' | 'csv-floor' | 'svg' | 'png') => {
+  const doExport = (what: 'report' | 'json' | 'csv' | 'csv-floor' | 'csv-bench' | 'svg' | 'png') => {
     const s = useApp.getState()
     const name = s.projectName.replace(/\s+/g, '_')
+    if (what === 'report') {
+      const metrics = computeSystemMetrics(s.nodes, s.demand)
+      const benchmarks = computeBenchmarks(metrics)
+      exportHtmlReport({
+        project: s.snapshot(),
+        metrics,
+        benchmarks,
+        grade: overallGrade(benchmarks),
+        spaghetti: computeSpaghettiSummary(s.spaghetti, s.demand.shiftsPerDay, s.demand.daysPerYear),
+        transport: computeTransportAudit(s.spaghetti, s.demand.unitsPerDay / Math.max(1, s.demand.shiftsPerDay)),
+        suggestions: generateKaizenSuggestions(s.nodes, s.demand, metrics),
+      })
+    }
     if (what === 'json') exportProjectJson(s.snapshot())
     if (what === 'csv') exportMetricsCsv(name, computeSystemMetrics(s.nodes, s.demand))
     if (what === 'csv-floor')
       exportSpaghettiCsv(name, computeSpaghettiSummary(s.spaghetti, s.demand.shiftsPerDay, s.demand.daysPerYear))
+    if (what === 'csv-bench') {
+      const rows = computeBenchmarks(computeSystemMetrics(s.nodes, s.demand))
+      exportBenchmarksCsv(name, rows, overallGrade(rows))
+    }
     if (what === 'svg' || what === 'png') {
       const onFloor = s.tab === 'spaghetti'
       const svg = onFloor ? floorSvgRef.current : vsmSvgRef.current
@@ -194,6 +216,8 @@ function TopBar({
           <FlaskConical size={14} />
         </IconBtn>
         <IconBtn title="Import project JSON" onClick={() => fileRef.current?.click()}><FolderOpen size={14} /></IconBtn>
+        <IconBtn title="Need definitions & formulas" onClick={() => setHelpOpen(true)}><BookOpen size={14} /></IconBtn>
+        <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
         <input ref={fileRef} type="file" accept=".json,application/json" className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]
@@ -222,9 +246,11 @@ function TopBar({
               >
                 {(
                   [
-                    ['json', 'Project file (.vstream.json)', 'Full model — re-importable'],
+                    ['report', 'Executive report (.html)', 'Print-ready full audit — open & File → Print to PDF'],
+                    ['json', 'Project file (.vstream.json)', 'Full model incl. scenarios — re-importable'],
                     ['csv', 'VSM metrics (.csv)', 'Audited cycle times, PCE report'],
                     ['csv-floor', 'Spaghetti economics (.csv)', 'Distances, costs, ROI per route'],
+                    ['csv-bench', 'Benchmarks (.csv)', 'Six KPIs vs typical & world class, grade'],
                     ['svg', `${tab === 'spaghetti' ? 'Floor map' : 'VSM sheet'} (.svg)`, 'Vector — print & slide ready'],
                     ['png', `${tab === 'spaghetti' ? 'Floor map' : 'VSM sheet'} (.png)`, '2× raster snapshot'],
                   ] as const

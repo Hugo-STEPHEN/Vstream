@@ -1,7 +1,9 @@
 import type { SystemMetrics, VsmProject } from '../types'
 import type { SpaghettiSummary } from './spaghetti'
+import type { BenchmarkRow } from './benchmarks'
+import { DEFINITIONS } from '../data/definitions'
 
-function download(blob: Blob, filename: string): void {
+export function download(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -84,6 +86,25 @@ export function exportSpaghettiCsv(name: string, s: SpaghettiSummary): void {
     ['Best-mode saving/year ($)', Math.round(s.bestModeSavingPerYear)],
   ]
   download(new Blob([toCsv(rows)], { type: 'text/csv' }), `${name}_spaghetti_${stamp()}.csv`)
+}
+
+export function exportBenchmarksCsv(name: string, rows: BenchmarkRow[], grade: { score: number; grade: string }): void {
+  const table: (string | number)[][] = [
+    ['Metric', 'Unit', 'Current', 'Typical', 'World class', 'Score (0-100)', 'Comment'],
+    ...rows.map((r) => [r.metric, r.unit, round2(r.current), r.typical, r.worldClass, Math.round(r.score), r.comment]),
+    [],
+    ['Composite score', round2(grade.score)],
+    ['Grade', grade.grade],
+  ]
+  download(new Blob([toCsv(table)], { type: 'text/csv' }), `${name}_benchmarks_${stamp()}.csv`)
+}
+
+export function exportDefinitionsCsv(): void {
+  const table: (string | number)[][] = [
+    ['Category', 'Term', 'Formula', 'Unit', 'Definition'],
+    ...DEFINITIONS.map((d) => [d.category, d.term, d.formula, d.unit, d.definition]),
+  ]
+  download(new Blob([toCsv(table)], { type: 'text/csv' }), `vstream_data_dictionary_${stamp()}.csv`)
 }
 
 export interface SnapshotOptions {

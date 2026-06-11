@@ -6,8 +6,10 @@ import { parseProjectJson } from './lib/exporters'
 import type {
   DemandConfig,
   EdgeKind,
+  FloorBackground,
   FloorZone,
   NodeKind,
+  Scenario,
   TransportMode,
   TravelRoute,
   VsmEdge,
@@ -38,6 +40,7 @@ export interface AppState {
   edges: VsmEdge[]
   demand: DemandConfig
   spaghetti: VsmProject['spaghetti']
+  scenarios: Scenario[]
   // ui
   tab: AppTab
   tool: VsmTool
@@ -80,8 +83,15 @@ export interface AppState {
   finishDraftRoute: () => void
   cancelDraftRoute: () => void
   updateRoute: (id: string, patch: Partial<TravelRoute>) => void
+  moveRoutePoint: (routeId: string, index: number, x: number, y: number) => void
   deleteFloorSelection: () => void
   setMetersPerUnit: (v: number) => void
+  setFloorBackground: (bg: FloorBackground | null) => void
+  // scenarios
+  saveScenario: (name: string) => void
+  applyScenario: (id: string) => void
+  deleteScenario: (id: string) => void
+  renameScenario: (id: string, name: string) => void
   // project lifecycle
   loadProject: (p: VsmProject) => void
   loadDemo: () => void
@@ -119,6 +129,7 @@ export const useApp = create<AppState>((set, get) => ({
   edges: init.edges,
   demand: init.demand,
   spaghetti: init.spaghetti,
+  scenarios: init.scenarios ?? [],
   tab: 'vsm',
   tool: 'select',
   edgeKind: 'push',
@@ -258,6 +269,17 @@ export const useApp = create<AppState>((set, get) => ({
         },
       }),
     ),
+  moveRoutePoint: (routeId, index, x, y) =>
+    set((s) => ({
+      spaghetti: {
+        ...s.spaghetti,
+        routes: s.spaghetti.routes.map((r) =>
+          r.id === routeId
+            ? { ...r, points: r.points.map((p, i) => (i === index ? { x, y } : p)) }
+            : r,
+        ),
+      },
+    })),
   deleteFloorSelection: () =>
     set((s) => {
       if (s.selectedZoneId) {
@@ -276,6 +298,44 @@ export const useApp = create<AppState>((set, get) => ({
     }),
   setMetersPerUnit: (metersPerUnit) =>
     set((s) => withHistory(s, { spaghetti: { ...s.spaghetti, metersPerUnit } })),
+  setFloorBackground: (bg) =>
+    set((s) =>
+      withHistory(s, {
+        spaghetti: { ...s.spaghetti, background: bg ?? undefined },
+      }),
+    ),
+
+  // --- scenarios ---
+  saveScenario: (name) =>
+    set((s) => ({
+      scenarios: [
+        ...s.scenarios,
+        {
+          id: nextId('sc'),
+          name,
+          savedAt: new Date().toISOString(),
+          nodes: structuredClone(s.nodes),
+          edges: structuredClone(s.edges),
+          demand: structuredClone(s.demand),
+        },
+      ],
+    })),
+  applyScenario: (id) =>
+    set((s) => {
+      const sc = s.scenarios.find((x) => x.id === id)
+      if (!sc) return {}
+      return withHistory(s, {
+        nodes: structuredClone(sc.nodes),
+        edges: structuredClone(sc.edges),
+        demand: structuredClone(sc.demand),
+        selectedNodeId: null,
+        selectedEdgeId: null,
+        connectFrom: null,
+      })
+    }),
+  deleteScenario: (id) => set((s) => ({ scenarios: s.scenarios.filter((x) => x.id !== id) })),
+  renameScenario: (id, name) =>
+    set((s) => ({ scenarios: s.scenarios.map((x) => (x.id === id ? { ...x, name } : x)) })),
 
   // --- project lifecycle ---
   loadProject: (p) =>
@@ -285,6 +345,7 @@ export const useApp = create<AppState>((set, get) => ({
       edges: p.edges,
       demand: p.demand,
       spaghetti: p.spaghetti,
+      scenarios: p.scenarios ?? [],
       selectedNodeId: null,
       selectedEdgeId: null,
       selectedZoneId: null,
@@ -314,6 +375,7 @@ export const useApp = create<AppState>((set, get) => ({
       edges: s.edges,
       demand: s.demand,
       spaghetti: s.spaghetti,
+      scenarios: s.scenarios,
     }
   },
 
@@ -359,6 +421,7 @@ useApp.subscribe((s) => {
           edges: s.edges,
           demand: s.demand,
           spaghetti: s.spaghetti,
+          scenarios: s.scenarios,
         } satisfies VsmProject),
       )
     } catch {

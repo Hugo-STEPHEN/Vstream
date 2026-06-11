@@ -80,19 +80,19 @@ const spaghetti: SpaghettiState = {
   ],
   routes: [
     {
-      id: 'r1', name: 'Coils → Stamping', mode: 'forklift', tripsPerShift: 12,
+      id: 'r1', linkedNodeId: 'p1', name: 'Coils → Stamping', mode: 'forklift', tripsPerShift: 12,
       points: [{ x: 170, y: 380 }, { x: 320, y: 380 }, { x: 320, y: 210 }, { x: 400, y: 210 }],
     },
     {
-      id: 'r2', name: 'Stamping → Weld', mode: 'forklift', tripsPerShift: 18,
+      id: 'r2', linkedNodeId: 'p2', name: 'Stamping → Weld', mode: 'forklift', tripsPerShift: 18,
       points: [{ x: 640, y: 210 }, { x: 740, y: 210 }],
     },
     {
-      id: 'r3', name: 'Weld → Assembly', mode: 'walk', tripsPerShift: 30,
+      id: 'r3', linkedNodeId: 'p3', name: 'Weld → Assembly', mode: 'walk', tripsPerShift: 30,
       points: [{ x: 860, y: 300 }, { x: 860, y: 360 }, { x: 620, y: 360 }, { x: 620, y: 420 }],
     },
     {
-      id: 'r4', name: 'Assembly → FG', mode: 'agv', tripsPerShift: 24,
+      id: 'r4', linkedNodeId: 'p4', name: 'Assembly → FG', mode: 'agv', tripsPerShift: 24,
       points: [{ x: 980, y: 480 }, { x: 1080, y: 480 }],
     },
     {

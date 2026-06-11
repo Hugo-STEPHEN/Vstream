@@ -217,6 +217,15 @@ export interface TravelRoute {
   points: { x: number; y: number }[]
   /** Round trips per shift. */
   tripsPerShift: number
+  /** Optional link to the VSM station this route feeds — enables the transport audit. */
+  linkedNodeId?: string
+}
+
+/** Uploaded plant-floor drawing rendered under the grid. */
+export interface FloorBackground {
+  dataUrl: string
+  /** 0.05 – 1. */
+  opacity: number
 }
 
 export interface SpaghettiState {
@@ -224,6 +233,7 @@ export interface SpaghettiState {
   routes: TravelRoute[]
   /** Plant scale: real-world meters represented by one canvas unit (px). */
   metersPerUnit: number
+  background?: FloorBackground
 }
 
 export interface RouteMetrics {
@@ -235,6 +245,21 @@ export interface RouteMetrics {
   minutesPerShift: number
   costPerShift: number
   costPerYear: number
+  linkedNodeId?: string
+}
+
+// ---------------------------------------------------------------------------
+// Scenario workbench (multivariable sandbox)
+// ---------------------------------------------------------------------------
+
+/** A named, frozen what-if state of the value stream model. */
+export interface Scenario {
+  id: string
+  name: string
+  savedAt: string
+  nodes: VsmNode[]
+  edges: VsmEdge[]
+  demand: DemandConfig
 }
 
 // ---------------------------------------------------------------------------
@@ -249,6 +274,8 @@ export interface VsmProject {
   edges: VsmEdge[]
   demand: DemandConfig
   spaghetti: SpaghettiState
+  /** Saved what-if scenarios (optional — absent in early v1 files). */
+  scenarios?: Scenario[]
 }
 
 // ---------------------------------------------------------------------------

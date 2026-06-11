@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
-import { Footprints, Forklift, MousePointer2, Route as RouteIcon, Square, Trash2, Bot } from 'lucide-react'
+import { Footprints, Forklift, ImagePlus, MousePointer2, Route as RouteIcon, Square, Trash2, Bot, X } from 'lucide-react'
 import { useApp } from '../../store'
-import { computeSpaghettiSummary, fmtMoney, TRANSPORT_PROFILES } from '../../lib/spaghetti'
+import { isProcessKind } from '../../lib/analytics'
+import { computeSpaghettiSummary, computeTransportAudit, fmtMoney, TRANSPORT_PROFILES } from '../../lib/spaghetti'
 import { NumberField, Section, Stat, TextField } from '../ui'
 import type { TransportMode } from '../../types'
 
@@ -32,6 +33,7 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
   const [zoneDraft, setZoneDraft] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
   const dragZone = useRef<{ id: string; dx: number; dy: number; moved: boolean } | null>(null)
+  const dragPoint = useRef<{ routeId: string; index: number; moved: boolean } | null>(null)
 
   const toWorld = (e: React.PointerEvent | React.MouseEvent): { x: number; y: number } => {
     const svg = svgRef.current
@@ -71,10 +73,19 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
       }
       useApp.getState().moveZone(dz.id, w.x + dz.dx, w.y + dz.dy)
     }
+    const dp = dragPoint.current
+    if (dp) {
+      if (!dp.moved) {
+        dp.moved = true
+        useApp.getState().updateRoute(dp.routeId, {}) // one undo entry per gesture
+      }
+      useApp.getState().moveRoutePoint(dp.routeId, dp.index, w.x, w.y)
+    }
   }
 
   const onPointerUp = () => {
     dragZone.current = null
+    dragPoint.current = null
     if (zoneDraft) {
       const x = Math.min(zoneDraft.x0, zoneDraft.x1)
       const y = Math.min(zoneDraft.y0, zoneDraft.y1)
@@ -147,7 +158,16 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
                 <path d="M 50 0 H 0 V 50" fill="none" stroke="#1E293B" strokeWidth="0.6" />
               </pattern>
             </defs>
-            <rect width={FLOOR.width} height={FLOOR.height} fill="url(#floorgrid)" />
+            {spaghetti.background && (
+              <image
+                href={spaghetti.background.dataUrl}
+                x={0} y={0} width={FLOOR.width} height={FLOOR.height}
+                preserveAspectRatio="xMidYMid meet"
+                opacity={spaghetti.background.opacity}
+                pointerEvents="none"
+              />
+            )}
+            <rect width={FLOOR.width} height={FLOOR.height} fill="url(#floorgrid)" pointerEvents="none" />
             <rect x={1} y={1} width={FLOOR.width - 2} height={FLOOR.height - 2} fill="none" stroke="#334155" strokeWidth={2} />
             <text x={14} y={FLOOR.height - 14} fill="#475569" fontFamily={MONO} fontSize={11}>
               scale: 1 unit = {spaghetti.metersPerUnit} m · 50-unit grid = {(50 * spaghetti.metersPerUnit).toFixed(1)} m
@@ -201,6 +221,22 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
                 </g>
               )
             })}
+
+            {/* Draggable waypoints of the selected route */}
+            {tool === 'select' && selectedRoute && selectedRoute.points.map((pt, i) => (
+              <circle
+                key={`${selectedRoute.id}-pt-${i}`}
+                cx={pt.x} cy={pt.y} r={7}
+                fill="#0B0F19" stroke="#22D3EE" strokeWidth={2}
+                className="cursor-move"
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return
+                  e.stopPropagation()
+                  dragPoint.current = { routeId: selectedRoute.id, index: i, moved: false }
+                  ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+                }}
+              />
+            ))}
 
             {draft.length > 0 && (
               <g pointerEvents="none">
@@ -263,7 +299,11 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
             </div>
             <NumberField label="Round trips" unit="/shift" value={selectedRoute.tripsPerShift} min={0} max={200} step={1} slider
               onChange={(tripsPerShift) => useApp.getState().updateRoute(selectedRoute.id, { tripsPerShift })} />
+            <RouteLink routeId={selectedRoute.id} linkedNodeId={selectedRoute.linkedNodeId} />
             <RouteReadout routeId={selectedRoute.id} />
+            <p className="text-[10px] leading-relaxed text-slate-500">
+              Drag the cyan handles on the canvas to reshape the route.
+            </p>
           </Section>
         ) : selectedZone ? (
           <Section
@@ -293,15 +333,18 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
             </div>
           </Section>
         ) : (
-          <Section title="Plant scale">
-            <NumberField label="Meters per canvas unit" unit="m" value={spaghetti.metersPerUnit} min={0.01} max={2} step={0.01}
-              onChange={(v) => useApp.getState().setMetersPerUnit(v)} />
-            <p className="text-[11px] leading-relaxed text-slate-500">
-              Draw the plant footprint with <b>Zone</b>, then trace material travel with <b>Route</b> —
-              click waypoints, double-click to commit. Line weight scales with trips per shift; every
-              meter is costed by transport mode.
-            </p>
-          </Section>
+          <>
+            <Section title="Plant scale">
+              <NumberField label="Meters per canvas unit" unit="m" value={spaghetti.metersPerUnit} min={0.01} max={2} step={0.01}
+                onChange={(v) => useApp.getState().setMetersPerUnit(v)} />
+              <p className="text-[11px] leading-relaxed text-slate-500">
+                Draw the plant footprint with <b>Zone</b>, then trace material travel with <b>Route</b> —
+                click waypoints, double-click to commit. Line weight scales with trips per shift; every
+                meter is costed by transport mode.
+              </p>
+            </Section>
+            <FloorPlanPanel />
+          </>
         )}
 
         <Section title={`Routes (${summary.routes.length})`}>
@@ -356,6 +399,75 @@ function ToolButton({ active, onClick, title, children }: {
   )
 }
 
+/** Link a floor route to the VSM station it feeds — enables the transport audit. */
+function RouteLink({ routeId, linkedNodeId }: { routeId: string; linkedNodeId?: string }) {
+  const nodes = useApp((s) => s.nodes)
+  const stations = nodes.filter((n) => isProcessKind(n.kind))
+  return (
+    <label className="block space-y-1">
+      <span className="field-label">Feeds VSM station</span>
+      <select
+        className="select-mini w-full !py-1.5"
+        value={linkedNodeId ?? ''}
+        onChange={(e) =>
+          useApp.getState().updateRoute(routeId, { linkedNodeId: e.target.value || undefined })
+        }
+      >
+        <option value="">— not linked —</option>
+        {stations.map((n) => (
+          <option key={n.id} value={n.id}>{n.label}</option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+/** Upload / tune the plant-floor drawing rendered under the grid. */
+function FloorPlanPanel() {
+  const background = useApp((s) => s.spaghetti.background)
+  const fileRef = useRef<HTMLInputElement>(null)
+  return (
+    <Section
+      title="Floor plan underlay"
+      right={
+        background ? (
+          <button className="text-slate-500 hover:text-crit transition-colors" title="Remove floor plan"
+            onClick={() => useApp.getState().setFloorBackground(null)}>
+            <X size={14} />
+          </button>
+        ) : undefined
+      }
+    >
+      <input
+        ref={fileRef} type="file" accept="image/*" className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (!file) return
+          const reader = new FileReader()
+          reader.onload = () => {
+            if (typeof reader.result === 'string') {
+              useApp.getState().setFloorBackground({ dataUrl: reader.result, opacity: 0.35 })
+            }
+          }
+          reader.readAsDataURL(file)
+          e.target.value = ''
+        }}
+      />
+      <button className="btn-ghost flex w-full items-center justify-center gap-1.5" onClick={() => fileRef.current?.click()}>
+        <ImagePlus size={13} /> {background ? 'Replace image…' : 'Upload plant layout…'}
+      </button>
+      {background && (
+        <NumberField label="Underlay opacity" unit="%" value={Math.round(background.opacity * 100)} min={5} max={100} step={5} slider
+          onChange={(v) => useApp.getState().setFloorBackground({ ...background, opacity: v / 100 })} />
+      )}
+      <p className="text-[10px] leading-relaxed text-slate-500">
+        Drop a CAD export or photo of the plant floor and trace zones and routes over it.
+        The image is stored inside the project file.
+      </p>
+    </Section>
+  )
+}
+
 function RouteReadout({ routeId }: { routeId: string }) {
   const spaghetti = useApp((s) => s.spaghetti)
   const demand = useApp((s) => s.demand)
@@ -363,14 +475,22 @@ function RouteReadout({ routeId }: { routeId: string }) {
     () => computeSpaghettiSummary(spaghetti, demand.shiftsPerDay, demand.daysPerYear),
     [spaghetti, demand.shiftsPerDay, demand.daysPerYear],
   )
+  const audit = useMemo(
+    () => computeTransportAudit(spaghetti, demand.unitsPerDay / Math.max(1, demand.shiftsPerDay)),
+    [spaghetti, demand.unitsPerDay, demand.shiftsPerDay],
+  )
   const m = summary.routes.find((r) => r.routeId === routeId)
   if (!m) return null
+  const perPart = audit.rows.find((r) => r.routeId === routeId)
   const rows: [string, string][] = [
     ['One-way distance', `${m.meters.toFixed(1)} m`],
     ['Steps (if walked)', m.steps > 0 ? String(m.steps) : '—'],
     ['Travel time / shift', `${m.minutesPerShift.toFixed(1)} min`],
     ['Cost / shift', fmtMoney(m.costPerShift)],
     ['Cost / year', fmtMoney(m.costPerYear)],
+    ...(perPart
+      ? ([['Transport / part', `${perPart.secondsPerPart.toFixed(1)} s · $${perPart.costPerPart.toFixed(3)}`]] as [string, string][])
+      : []),
   ]
   return (
     <div className="panel bg-ink p-2 space-y-1">

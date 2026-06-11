@@ -2,19 +2,27 @@ import { useMemo, useState } from 'react'
 import {
   Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { Check, Copy, Leaf, Plug, Sparkles, Zap } from 'lucide-react'
+import { Check, Copy, Leaf, Plug, Sparkles, Truck, Zap } from 'lucide-react'
 import { useApp } from '../../store'
 import { computeSystemMetrics, fmtSeconds } from '../../lib/analytics'
 import { buildCopilotPrompt, generateKaizenSuggestions } from '../../lib/copilot'
+import { computeTransportAudit } from '../../lib/spaghetti'
 import { Badge, Section, Stat } from '../ui'
+import { ScenarioBar } from './ScenarioBar'
+import { SensitivityExplorer } from './SensitivityExplorer'
 import type { MetricsUpdatePayload } from '../../types'
 
 export function AnalyticsView() {
   const nodes = useApp((s) => s.nodes)
   const demand = useApp((s) => s.demand)
+  const spaghetti = useApp((s) => s.spaghetti)
   const updateNode = useApp((s) => s.updateNode)
 
   const metrics = useMemo(() => computeSystemMetrics(nodes, demand), [nodes, demand])
+  const transport = useMemo(
+    () => computeTransportAudit(spaghetti, demand.unitsPerDay / Math.max(1, demand.shiftsPerDay)),
+    [spaghetti, demand.unitsPerDay, demand.shiftsPerDay],
+  )
   const suggestions = useMemo(
     () => generateKaizenSuggestions(nodes, demand, metrics),
     [nodes, demand, metrics],
@@ -31,7 +39,7 @@ export function AnalyticsView() {
   }))
 
   return (
-    <div className="grid h-full grid-cols-1 gap-2 overflow-y-auto p-2 xl:grid-cols-2">
+    <div className="grid h-full grid-cols-1 content-start gap-2 overflow-y-auto p-2 xl:grid-cols-2">
       {/* Sandbox summary header spans both columns */}
       <div className="xl:col-span-2 flex flex-wrap gap-2">
         <Stat label="Takt" value={fmtSeconds(metrics.taktSeconds)} tone="flow" sub={`${metrics.demandPerDay} u/day demand`} />
@@ -44,6 +52,15 @@ export function AnalyticsView() {
           tone={metrics.firstPassYield > 0.97 ? 'good' : 'warn'} />
         <Stat label="Direct labor" value={`${metrics.totalOperators.toFixed(1)} FTE`}
           sub={`≈ $${Math.round(metrics.totalOperators * demand.laborRatePerHour * (metrics.availableSecondsPerDay / 3600)).toLocaleString()}/day`} />
+        {transport.rows.length > 0 && (
+          <Stat label="Transport / part" value={fmtSeconds(transport.totalSecondsPerPart)} tone="warn"
+            sub={`$${transport.totalCostPerPart.toFixed(2)}/part conveyance`} />
+        )}
+      </div>
+
+      {/* Scenario workbench spans both columns */}
+      <div className="xl:col-span-2">
+        <ScenarioBar />
       </div>
 
       {/* Station load vs takt */}
@@ -170,7 +187,47 @@ export function AnalyticsView() {
         </p>
       </Section>
 
+      {/* Sensitivity curves */}
+      <SensitivityExplorer />
+
       <div className="space-y-2">
+        {/* VSM ↔ spaghetti transport audit */}
+        {transport.rows.length > 0 && (
+          <Section title="Transport audit — spaghetti routes per part">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="text-left text-slate-500">
+                  {['Route → station', 'Mode', 'Time/part', '$/part'].map((h) => (
+                    <th key={h} className="pb-1 pr-2 font-medium">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="font-mono">
+                {transport.rows.map((r) => (
+                  <tr key={r.routeId} className="cursor-pointer border-t border-edge/60 hover:bg-edge/30"
+                    onClick={() => {
+                      useApp.getState().selectNode(r.nodeId)
+                      useApp.getState().setTab('vsm')
+                    }}>
+                    <td className="py-1 pr-2 font-ui text-slate-200">
+                      <Truck size={11} className="mr-1 inline text-warn" />
+                      {r.routeName} → {nodes.find((n) => n.id === r.nodeId)?.label ?? '?'}
+                    </td>
+                    <td className="py-1 pr-2 text-slate-400">{r.mode}</td>
+                    <td className="py-1 pr-2 text-warn">{r.secondsPerPart.toFixed(1)}s</td>
+                    <td className="py-1 text-slate-300">${r.costPerPart.toFixed(3)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-[10.5px] text-slate-500">
+              Conveyance seconds each produced part carries on floor routes linked to VSM stations
+              (link routes in the Spaghetti inspector). Transport is pure muda — compare it to the
+              stations' cycle times.
+            </p>
+          </Section>
+        )}
+
         {/* ESG auditor */}
         <Section title="ESG carbon & waste auditor (E-VSM)">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

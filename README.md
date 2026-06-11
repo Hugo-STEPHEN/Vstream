@@ -45,8 +45,9 @@ Connections: **Push** (striped scheduling arrow), **Pull** (withdrawal loop),
 Stations breaching takt pulse red on the canvas; the system bottleneck is flagged amber.
 
 ### 2. Spaghetti Studio
-Draw the plant footprint as colored zones, then trace material travel as routes with
-three transport profiles:
+Draw the plant footprint as colored zones — optionally over an **uploaded floor-plan
+image** (CAD export or photo, stored in the project file with adjustable opacity) —
+then trace material travel as routes with three transport profiles:
 
 | Mode | Cost | Speed |
 |---|---|---|
@@ -56,7 +57,9 @@ three transport profiles:
 
 Each route is costed live (distance × trips × mode) per shift and per year, with a
 best-mode ROI estimate. Line weight scales with traffic intensity. Plant scale
-(meters per canvas unit) is configurable.
+(meters per canvas unit) is configurable. Select a route to **drag its waypoints**,
+and **link it to the VSM station it feeds** — linked routes appear in the transport
+audit as conveyance seconds and dollars per produced part.
 
 ### 3. Flow Analytics
 The scenario sandbox: station load vs takt with full **loss decomposition**
@@ -66,6 +69,18 @@ The scenario sandbox: station load vs takt with full **loss decomposition**
 **ValueStream co-pilot**: deterministic kaizen suggestions whose quoted impact is a
 real re-simulation of the whole model — one click applies the countermeasure.
 
+Two simulation instruments complete the sandbox:
+
+- **Scenario workbench** — freeze the current model (stations, connections, demand)
+  as a named scenario, keep tweaking the canvas, and compare every saved state side
+  by side (lead time, PCE, capacity, FPY, grade, with deltas). Apply any scenario
+  back to the canvas (undoable). Scenarios are saved in the project file.
+- **Sensitivity explorer** — sweep one station parameter (CT, availability, scrap,
+  setup, batch) across its range; PCE and capacity response curves are 25 honest
+  re-simulations of the whole engine, with the current value marked.
+- **Transport audit** — spaghetti routes linked to VSM stations are allocated per
+  produced part, making conveyance muda directly comparable to cycle times.
+
 ### 4. Benchmarks
 Six lean KPIs scored against *typical batch-and-queue* (0) and *world-class lean*
 (100) references, with a composite A–E grade and positioning radar.
@@ -74,7 +89,9 @@ Six lean KPIs scored against *typical batch-and-queue* (0) and *world-class lean
 
 ## Need definitions — the mathematical contract
 
-All quantities below are computed in `src/lib/analytics.ts` and covered by tests.
+The **complete data dictionary lives in `src/data/definitions.ts`** — one source of
+truth rendered in-app (book icon in the top bar, searchable, with keyboard shortcuts),
+exportable as CSV, and appended to every executive report. The core quantities:
 
 ### Demand & takt
 | Term | Definition | Formula |
@@ -112,17 +129,36 @@ All quantities below are computed in `src/lib/analytics.ts` and covered by tests
 QC gates and rework loops count toward lead time but **not** toward value-add (configurable
 per station), so inspection-heavy streams are honestly penalized in PCE.
 
+### Spaghetti & transport
+| Term | Definition | Formula |
+|---|---|---|
+| Route distance | One-way path length at plant scale | `polyline length × m/unit` |
+| Transport cost | Financial footprint of a route | `m/shift × mode $/m` |
+| **Transport / part** | Conveyance waste per produced part (linked routes) | `(m/shift ÷ speed) ÷ parts/shift` |
+| Best-mode ROI | Saving if every route ran its cheapest mode | `Σ max(0, cost − cheapest)` |
+
 ### ESG (E-VSM)
 Energy = `Σ station kW × busy hours/day`; CO₂e = energy × grid factor; scrap mass =
 excess starts × part weight. Grid factor, part weight and labor rate are project settings.
+
+### Scenarios & sensitivity
+A **scenario** is a frozen `{stations, connections, demand}` snapshot compared on
+lead time, PCE, capacity, FPY and grade. A **sensitivity sweep** re-runs the entire
+engine at each of 25 points across one parameter's range — no interpolation.
 
 ---
 
 ## Export & data
 
-- **Project file** `.vstream.json` — full model, versioned schema (`vstream/v1`), re-importable.
+- **Executive report** `.html` — self-contained, print-to-PDF ready audit: KPI summary,
+  station & inventory audits, alerts, kaizen countermeasures, benchmarks with grade,
+  spaghetti economics, transport audit, ESG and the full definitions appendix.
+- **Project file** `.vstream.json` — full model incl. scenarios and floor-plan underlay,
+  versioned schema (`vstream/v1`), re-importable.
 - **VSM metrics CSV** — the audited PCE report: every station's CT waterfall, flags, totals.
 - **Spaghetti CSV** — route distances, steps, time and cost per shift/year, ROI.
+- **Benchmarks CSV** — six KPIs vs typical & world class with scores and grade.
+- **Data dictionary CSV** — every defined term with formula, unit and meaning.
 - **SVG / PNG** — print-ready vector or 2× raster snapshot of the VSM sheet or floor map.
 - Autosave to `localStorage` after every change; undo/redo (Ctrl+Z / Ctrl+Shift+Z).
 
@@ -140,18 +176,24 @@ excess starts × part weight. Grid factor, part weight and labor rate are projec
 ```
 src/
   types.ts                 Domain model (strict TS, no `any`)
-  store.ts                 Zustand store: project, tools, undo/redo, autosave
+  store.ts                 Zustand store: project, tools, scenarios, undo/redo, autosave
+  data/
+    definitions.ts         The complete need/metric dictionary (single source of truth)
+    palette.ts, demo.ts    Element catalog, Acme demo stream
   lib/
     analytics.ts           Lean math engine (pure, tested)
-    spaghetti.ts           Travel distance / cost / ROI engine
+    sensitivity.ts         Single-variable sweep engine (pure, tested)
+    spaghetti.ts           Travel distance / cost / ROI + transport audit (tested)
     benchmarks.ts          KPI scoring vs typical & world-class references
     copilot.ts             What-if kaizen engine + LLM grounding prompt
+    report.ts              Self-contained executive HTML report builder (tested)
     exporters.ts           JSON / CSV / SVG / PNG exporters
     fuzzy.ts, geometry.ts  Toolbox search, lane clamping
   components/
+    HelpModal.tsx          Searchable in-app definitions & shortcuts
     vsm/                   Canvas, toolbox, inspector, node glyphs
-    spaghetti/             Floor studio
-    analytics/             Sandbox, co-pilot, ESG, connectors
+    spaghetti/             Floor studio (image underlay, waypoint editing, VSM links)
+    analytics/             Sandbox, scenarios, sensitivity, co-pilot, ESG, connectors
     benchmarks/            Grade, radar, detail table
 ```
 

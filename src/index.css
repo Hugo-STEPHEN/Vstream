@@ -40,4 +40,8 @@
     @apply px-2.5 py-1.5 rounded-md border border-edge text-slate-300 text-xs
       hover:border-steel hover:text-white hover:bg-edge/40 transition-colors;
   }
+  .select-mini {
+    @apply bg-ink border border-edge rounded-md px-1.5 py-1 text-[11px] text-slate-200
+      focus:outline-none focus:border-flow/70 transition-colors;
+  }
 }
