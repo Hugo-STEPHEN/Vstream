@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity, BarChart3, BookOpen, Download, FilePlus2, FlaskConical, FolderOpen, Map as MapIcon,
-  Redo2, Undo2, Waypoints,
+  Redo2, SlidersHorizontal, Undo2, Waypoints,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useApp, type AppTab } from './store'
@@ -21,6 +21,7 @@ import { SpaghettiStudio, FLOOR } from './components/spaghetti/SpaghettiStudio'
 import { AnalyticsView } from './components/analytics/AnalyticsView'
 import { BenchmarkView } from './components/benchmarks/BenchmarkView'
 import { HelpModal } from './components/HelpModal'
+import { CalibrationModal } from './components/CalibrationModal'
 
 const TABS: { id: AppTab; label: string; icon: typeof Waypoints }[] = [
   { id: 'vsm', label: 'VSM Studio', icon: Waypoints },
@@ -35,10 +36,11 @@ export default function App() {
   const projectName = useApp((s) => s.projectName)
   const nodes = useApp((s) => s.nodes)
   const demand = useApp((s) => s.demand)
+  const calibration = useApp((s) => s.calibration)
   const past = useApp((s) => s.past)
   const future = useApp((s) => s.future)
 
-  const metrics = useMemo(() => computeSystemMetrics(nodes, demand), [nodes, demand])
+  const metrics = useMemo(() => computeSystemMetrics(nodes, demand, calibration), [nodes, demand, calibration])
   const vsmSvgRef = useRef<SVGSVGElement>(null)
   const floorSvgRef = useRef<SVGSVGElement>(null)
 
@@ -117,30 +119,32 @@ function TopBar({
   const setProjectName = useApp((s) => s.setProjectName)
   const [exportOpen, setExportOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [calibrationOpen, setCalibrationOpen] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const doExport = (what: 'report' | 'json' | 'csv' | 'csv-floor' | 'csv-bench' | 'svg' | 'png') => {
     const s = useApp.getState()
     const name = s.projectName.replace(/\s+/g, '_')
     if (what === 'report') {
-      const metrics = computeSystemMetrics(s.nodes, s.demand)
-      const benchmarks = computeBenchmarks(metrics)
+      const metrics = computeSystemMetrics(s.nodes, s.demand, s.calibration)
+      const benchmarks = computeBenchmarks(metrics, s.calibration)
       exportHtmlReport({
         project: s.snapshot(),
         metrics,
         benchmarks,
         grade: overallGrade(benchmarks),
-        spaghetti: computeSpaghettiSummary(s.spaghetti, s.demand.shiftsPerDay, s.demand.daysPerYear),
-        transport: computeTransportAudit(s.spaghetti, s.demand.unitsPerDay / Math.max(1, s.demand.shiftsPerDay)),
-        suggestions: generateKaizenSuggestions(s.nodes, s.demand, metrics),
+        spaghetti: computeSpaghettiSummary(s.spaghetti, s.demand.shiftsPerDay, s.demand.daysPerYear, s.calibration),
+        transport: computeTransportAudit(s.spaghetti, s.demand.unitsPerDay / Math.max(1, s.demand.shiftsPerDay), s.calibration),
+        suggestions: generateKaizenSuggestions(s.nodes, s.demand, metrics, s.calibration),
+        calibration: s.calibration,
       })
     }
     if (what === 'json') exportProjectJson(s.snapshot())
-    if (what === 'csv') exportMetricsCsv(name, computeSystemMetrics(s.nodes, s.demand))
+    if (what === 'csv') exportMetricsCsv(name, computeSystemMetrics(s.nodes, s.demand, s.calibration))
     if (what === 'csv-floor')
-      exportSpaghettiCsv(name, computeSpaghettiSummary(s.spaghetti, s.demand.shiftsPerDay, s.demand.daysPerYear))
+      exportSpaghettiCsv(name, computeSpaghettiSummary(s.spaghetti, s.demand.shiftsPerDay, s.demand.daysPerYear, s.calibration))
     if (what === 'csv-bench') {
-      const rows = computeBenchmarks(computeSystemMetrics(s.nodes, s.demand))
+      const rows = computeBenchmarks(computeSystemMetrics(s.nodes, s.demand, s.calibration), s.calibration)
       exportBenchmarksCsv(name, rows, overallGrade(rows))
     }
     if (what === 'svg' || what === 'png') {
@@ -216,7 +220,11 @@ function TopBar({
           <FlaskConical size={14} />
         </IconBtn>
         <IconBtn title="Import project JSON" onClick={() => fileRef.current?.click()}><FolderOpen size={14} /></IconBtn>
+        <IconBtn title="Model calibration — thresholds, transport economics, benchmark targets" onClick={() => setCalibrationOpen(true)}>
+          <SlidersHorizontal size={14} />
+        </IconBtn>
         <IconBtn title="Need definitions & formulas" onClick={() => setHelpOpen(true)}><BookOpen size={14} /></IconBtn>
+        <CalibrationModal open={calibrationOpen} onClose={() => setCalibrationOpen(false)} />
         <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
         <input ref={fileRef} type="file" accept=".json,application/json" className="hidden"
           onChange={(e) => {

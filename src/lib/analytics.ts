@@ -1,5 +1,8 @@
+import { DEFAULT_CALIBRATION } from './calibration'
 import type {
   Alert,
+  AlertThresholds,
+  CalibrationConfig,
   DemandConfig,
   InventoryMetrics,
   LadderStep,
@@ -40,7 +43,11 @@ export function setupAmortization(setupSeconds: number, batchSize: number): numb
   return setupSeconds / Math.max(1, batchSize)
 }
 
-export function computeProcessMetrics(node: VsmNode, taktSeconds: number): ProcessMetrics {
+export function computeProcessMetrics(
+  node: VsmNode,
+  taktSeconds: number,
+  smedFactor: number = DEFAULT_CALIBRATION.alerts.smedFactor,
+): ProcessMetrics {
   const ctNominal = Math.max(0, node.ct ?? 0)
   const availability = clamp(node.availability ?? 1, 0.1, 1)
   const scrap = clamp(node.scrap ?? 0, 0, 0.95)
@@ -69,7 +76,7 @@ export function computeProcessMetrics(node: VsmNode, taktSeconds: number): Proce
     operators: Math.max(0, node.operators ?? 0),
     taktUtilization,
     exceedsTakt: taktSeconds > 0 && ctGrand > taktSeconds,
-    smedAlert: ctNominal > 0 && setupPenalty > ctNominal * 0.5,
+    smedAlert: ctNominal > 0 && setupPenalty > ctNominal * smedFactor,
     valueAdd: node.valueAdd ?? node.kind === 'process',
   }
 }
@@ -88,7 +95,11 @@ export function computeInventoryMetrics(node: VsmNode, demandPerDay: number, ava
 }
 
 /** Full closed-loop system computation. Pure; re-runs on every state change. */
-export function computeSystemMetrics(nodes: VsmNode[], demand: DemandConfig): SystemMetrics {
+export function computeSystemMetrics(
+  nodes: VsmNode[],
+  demand: DemandConfig,
+  cal: CalibrationConfig = DEFAULT_CALIBRATION,
+): SystemMetrics {
   const availableSecondsPerDay = demand.shiftsPerDay * demand.netMinutesPerShift * 60
   const demandPerDay = Math.max(0, demand.unitsPerDay)
   const taktSeconds = demandPerDay > 0 ? availableSecondsPerDay / demandPerDay : 0
@@ -105,7 +116,7 @@ export function computeSystemMetrics(nodes: VsmNode[], demand: DemandConfig): Sy
 
   for (const node of chain) {
     if (isProcessKind(node.kind)) {
-      const m = computeProcessMetrics(node, taktSeconds)
+      const m = computeProcessMetrics(node, taktSeconds, cal.alerts.smedFactor)
       processes.push(m)
       ladder.push({
         type: 'va',
@@ -139,7 +150,7 @@ export function computeSystemMetrics(nodes: VsmNode[], demand: DemandConfig): Sy
   // ESG: a station is busy ctGrand seconds per part for every good part made.
   const kwhPerDay = nodes.reduce((s, n) => {
     if (!isProcessKind(n.kind) || !n.powerKw) return s
-    const m = computeProcessMetrics(n, taktSeconds)
+    const m = computeProcessMetrics(n, taktSeconds, cal.alerts.smedFactor)
     const busyHoursPerDay = Math.min(
       (m.ctGrand * demandPerDay) / 3600,
       availableSecondsPerDay / 3600,
@@ -153,7 +164,7 @@ export function computeSystemMetrics(nodes: VsmNode[], demand: DemandConfig): Sy
     return s + (starts - demandPerDay)
   }, 0)
 
-  const alerts = buildAlerts(processes, inventories, taktSeconds, pce)
+  const alerts = buildAlerts(processes, inventories, taktSeconds, pce, cal.alerts)
 
   return {
     taktSeconds,
@@ -186,6 +197,7 @@ function buildAlerts(
   inventories: InventoryMetrics[],
   taktSeconds: number,
   pce: number,
+  t: AlertThresholds,
 ): Alert[] {
   const alerts: Alert[] = []
   for (const p of processes) {
@@ -204,10 +216,10 @@ function buildAlerts(
         nodeId: p.nodeId,
         level: 'warning',
         title: `High setup penalty at ${p.label}`,
-        detail: `Amortized changeover adds ${fmtSeconds(p.setupPenalty)}/part — over 50% of its ${fmtSeconds(p.ctNominal)} nominal CT. Run a SMED workshop or raise batch size (at the cost of inventory).`,
+        detail: `Amortized changeover adds ${fmtSeconds(p.setupPenalty)}/part — over ${Math.round(t.smedFactor * 100)}% of its ${fmtSeconds(p.ctNominal)} nominal CT. Run a SMED workshop or raise batch size (at the cost of inventory).`,
       })
     }
-    if (p.scrap >= 0.05) {
+    if (p.scrap >= t.scrapWarn) {
       alerts.push({
         id: `scrap-${p.nodeId}`,
         nodeId: p.nodeId,
@@ -216,7 +228,7 @@ function buildAlerts(
         detail: `Quality losses inflate effective CT to ${fmtSeconds(p.ctQuality)}. Root-cause the top defect mode.`,
       })
     }
-    if (p.availability < 0.7) {
+    if (p.availability < t.availabilityWarn) {
       alerts.push({
         id: `oee-${p.nodeId}`,
         nodeId: p.nodeId,
@@ -227,7 +239,7 @@ function buildAlerts(
     }
   }
   for (const inv of inventories) {
-    if (inv.days > 5) {
+    if (inv.days > t.inventoryDaysWarn) {
       alerts.push({
         id: `inv-${inv.nodeId}`,
         nodeId: inv.nodeId,
@@ -237,12 +249,12 @@ function buildAlerts(
       })
     }
   }
-  if (pce > 0 && pce < 5) {
+  if (pce > 0 && pce < t.pceLowPct) {
     alerts.push({
       id: 'pce-low',
       level: 'info',
       title: `PCE ${pce.toFixed(1)}% — flow opportunity`,
-      detail: 'Less than 5% of the lead time adds value. Attack the largest NVA valleys first.',
+      detail: `Less than ${t.pceLowPct}% of the lead time adds value. Attack the largest NVA valleys first.`,
     })
   }
   return alerts

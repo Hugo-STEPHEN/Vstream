@@ -21,8 +21,9 @@ export function Inspector() {
   const updateNode = useApp((s) => s.updateNode)
   const updateDemand = useApp((s) => s.updateDemand)
   const deleteSelection = useApp((s) => s.deleteSelection)
+  const calibration = useApp((s) => s.calibration)
 
-  const metrics = useMemo(() => computeSystemMetrics(nodes, demand), [nodes, demand])
+  const metrics = useMemo(() => computeSystemMetrics(nodes, demand, calibration), [nodes, demand, calibration])
   const node = nodes.find((n) => n.id === selectedNodeId)
   const edge = edges.find((e) => e.id === selectedEdgeId)
 
@@ -171,10 +172,11 @@ export function Inspector() {
 function ProcessReadout({ nodeId }: { nodeId: string }) {
   const nodes = useApp((s) => s.nodes)
   const demand = useApp((s) => s.demand)
-  const metrics = useMemo(() => computeSystemMetrics(nodes, demand), [nodes, demand])
+  const calibration = useApp((s) => s.calibration)
+  const metrics = useMemo(() => computeSystemMetrics(nodes, demand, calibration), [nodes, demand, calibration])
   const node = nodes.find((n) => n.id === nodeId)
   if (!node) return null
-  const m = computeProcessMetrics(node, metrics.taktSeconds)
+  const m = computeProcessMetrics(node, metrics.taktSeconds, calibration.alerts.smedFactor)
 
   const rows: [string, string, string][] = [
     ['CT nominal', fmtSeconds(m.ctNominal), 'text-slate-200'],

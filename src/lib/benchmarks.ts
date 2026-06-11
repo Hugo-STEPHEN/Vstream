@@ -1,4 +1,5 @@
-import type { SystemMetrics } from '../types'
+import { DEFAULT_CALIBRATION } from './calibration'
+import type { CalibrationConfig, SystemMetrics } from '../types'
 
 export interface BenchmarkRow {
   key: string
@@ -29,7 +30,11 @@ function score(current: number, typical: number, worldClass: number, higherIsBet
  * (Rother/Shook "Learning to See", world-class OEE ≈ 85%) — heuristics for
  * orientation, not certified industry statistics.
  */
-export function computeBenchmarks(m: SystemMetrics): BenchmarkRow[] {
+export function computeBenchmarks(
+  m: SystemMetrics,
+  cal: CalibrationConfig = DEFAULT_CALIBRATION,
+): BenchmarkRow[] {
+  const t = cal.benchmarks
   const inventoryDays =
     m.availableSecondsPerDay > 0 ? m.totalNvaSeconds / m.availableSecondsPerDay : 0
   const avgAvailability =
@@ -49,8 +54,8 @@ export function computeBenchmarks(m: SystemMetrics): BenchmarkRow[] {
       metric: 'Process cycle efficiency',
       unit: '%',
       current: m.pce,
-      typical: 2,
-      worldClass: 25,
+      typical: t.pce.typical,
+      worldClass: t.pce.worldClass,
       higherIsBetter: true,
       comment: 'Share of lead time that adds value. Discrete-manufacturing world class ≥ 25%.',
     },
@@ -59,8 +64,8 @@ export function computeBenchmarks(m: SystemMetrics): BenchmarkRow[] {
       metric: 'Average availability (OEE-A)',
       unit: '%',
       current: avgAvailability * 100,
-      typical: 75,
-      worldClass: 90,
+      typical: t.availability.typical,
+      worldClass: t.availability.worldClass,
       higherIsBetter: true,
       comment: 'Mean uptime ratio across stations. World-class OEE programs hold ≥ 90% availability.',
     },
@@ -69,8 +74,8 @@ export function computeBenchmarks(m: SystemMetrics): BenchmarkRow[] {
       metric: 'First pass yield',
       unit: '%',
       current: m.firstPassYield * 100,
-      typical: 90,
-      worldClass: 99,
+      typical: t.fpy.typical,
+      worldClass: t.fpy.worldClass,
       higherIsBetter: true,
       comment: 'Probability a part passes every station without rework or scrap.',
     },
@@ -79,8 +84,8 @@ export function computeBenchmarks(m: SystemMetrics): BenchmarkRow[] {
       metric: 'Inventory coverage',
       unit: 'days',
       current: inventoryDays,
-      typical: 15,
-      worldClass: 2,
+      typical: t.inventory.typical,
+      worldClass: t.inventory.worldClass,
       higherIsBetter: false,
       comment: 'Total queued WIP expressed in days of demand.',
     },
@@ -89,8 +94,8 @@ export function computeBenchmarks(m: SystemMetrics): BenchmarkRow[] {
       metric: 'Setup share of processing',
       unit: '%',
       current: setupShare,
-      typical: 20,
-      worldClass: 5,
+      typical: t.setup.typical,
+      worldClass: t.setup.worldClass,
       higherIsBetter: false,
       comment: 'Amortized changeover as share of total station time. SMED targets < 5%.',
     },
@@ -99,8 +104,8 @@ export function computeBenchmarks(m: SystemMetrics): BenchmarkRow[] {
       metric: 'Capacity vs demand',
       unit: '%',
       current: capacityMargin,
-      typical: 100,
-      worldClass: 120,
+      typical: t.capacity.typical,
+      worldClass: t.capacity.worldClass,
       higherIsBetter: true,
       comment: 'Bottleneck throughput as a share of demand. < 100% means missed shipments.',
     },

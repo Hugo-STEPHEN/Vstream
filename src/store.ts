@@ -1,9 +1,11 @@
 import { create } from 'zustand'
 import { NODE_LANE, PALETTE_BY_KIND } from './data/palette'
 import { createDemoProject, createBlankProject } from './data/demo'
+import { mergeCalibration } from './lib/calibration'
 import { clampToLane } from './lib/geometry'
 import { parseProjectJson } from './lib/exporters'
 import type {
+  CalibrationConfig,
   DemandConfig,
   EdgeKind,
   FloorBackground,
@@ -31,6 +33,7 @@ interface HistoryShape {
   edges: VsmEdge[]
   spaghetti: VsmProject['spaghetti']
   demand: DemandConfig
+  calibration: CalibrationConfig
 }
 
 export interface AppState {
@@ -41,6 +44,7 @@ export interface AppState {
   demand: DemandConfig
   spaghetti: VsmProject['spaghetti']
   scenarios: Scenario[]
+  calibration: CalibrationConfig
   // ui
   tab: AppTab
   tool: VsmTool
@@ -92,6 +96,9 @@ export interface AppState {
   applyScenario: (id: string) => void
   deleteScenario: (id: string) => void
   renameScenario: (id: string, name: string) => void
+  // calibration
+  setCalibration: (cal: CalibrationConfig) => void
+  resetCalibration: () => void
   // project lifecycle
   loadProject: (p: VsmProject) => void
   loadDemo: () => void
@@ -103,7 +110,9 @@ export interface AppState {
 }
 
 function takeHistory(s: AppState): HistoryShape {
-  return structuredClone({ nodes: s.nodes, edges: s.edges, spaghetti: s.spaghetti, demand: s.demand })
+  return structuredClone({
+    nodes: s.nodes, edges: s.edges, spaghetti: s.spaghetti, demand: s.demand, calibration: s.calibration,
+  })
 }
 
 /** Wrap a mutation so it records undo history (capped at 60 entries). */
@@ -130,6 +139,7 @@ export const useApp = create<AppState>((set, get) => ({
   demand: init.demand,
   spaghetti: init.spaghetti,
   scenarios: init.scenarios ?? [],
+  calibration: mergeCalibration(init.calibration),
   tab: 'vsm',
   tool: 'select',
   edgeKind: 'push',
@@ -337,6 +347,10 @@ export const useApp = create<AppState>((set, get) => ({
   renameScenario: (id, name) =>
     set((s) => ({ scenarios: s.scenarios.map((x) => (x.id === id ? { ...x, name } : x)) })),
 
+  // --- calibration ---
+  setCalibration: (cal) => set((s) => withHistory(s, { calibration: mergeCalibration(cal) })),
+  resetCalibration: () => set((s) => withHistory(s, { calibration: mergeCalibration() })),
+
   // --- project lifecycle ---
   loadProject: (p) =>
     set({
@@ -346,6 +360,7 @@ export const useApp = create<AppState>((set, get) => ({
       demand: p.demand,
       spaghetti: p.spaghetti,
       scenarios: p.scenarios ?? [],
+      calibration: mergeCalibration(p.calibration),
       selectedNodeId: null,
       selectedEdgeId: null,
       selectedZoneId: null,
@@ -376,6 +391,7 @@ export const useApp = create<AppState>((set, get) => ({
       demand: s.demand,
       spaghetti: s.spaghetti,
       scenarios: s.scenarios,
+      calibration: s.calibration,
     }
   },
 
@@ -422,6 +438,7 @@ useApp.subscribe((s) => {
           demand: s.demand,
           spaghetti: s.spaghetti,
           scenarios: s.scenarios,
+          calibration: s.calibration,
         } satisfies VsmProject),
       )
     } catch {

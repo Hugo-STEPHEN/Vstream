@@ -1,5 +1,6 @@
 import { computeSystemMetrics } from './analytics'
-import type { DemandConfig, VsmNode } from '../types'
+import { DEFAULT_CALIBRATION } from './calibration'
+import type { CalibrationConfig, DemandConfig, VsmNode } from '../types'
 
 /** Station parameters that can be swept in the sensitivity explorer. */
 export type SweepParam = 'ct' | 'availability' | 'scrap' | 'setup' | 'batch'
@@ -92,6 +93,7 @@ export function sweepSensitivity(
   nodeId: string,
   param: SweepParam,
   steps = 25,
+  cal: CalibrationConfig = DEFAULT_CALIBRATION,
 ): SweepResult | null {
   const def = SWEEP_PARAM_BY_KEY.get(param)
   const node = nodes.find((n) => n.id === nodeId)
@@ -102,7 +104,7 @@ export function sweepSensitivity(
   for (let i = 0; i < steps; i++) {
     const value = min + ((max - min) * i) / (steps - 1)
     const clone = nodes.map((n) => (n.id === nodeId ? { ...n, ...def.write(value) } : n))
-    const m = computeSystemMetrics(clone, demand)
+    const m = computeSystemMetrics(clone, demand, cal)
     const pm = m.processes.find((p) => p.nodeId === nodeId)
     points.push({
       value,

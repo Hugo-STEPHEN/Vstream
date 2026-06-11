@@ -15,6 +15,7 @@ import { Section } from '../ui'
 export function SensitivityExplorer() {
   const nodes = useApp((s) => s.nodes)
   const demand = useApp((s) => s.demand)
+  const calibration = useApp((s) => s.calibration)
 
   const stations = useMemo(() => nodes.filter((n) => isProcessKind(n.kind)), [nodes])
   const [nodeId, setNodeId] = useState<string>('')
@@ -24,8 +25,8 @@ export function SensitivityExplorer() {
   const def = SWEEP_PARAM_BY_KEY.get(param)
 
   const sweep = useMemo(
-    () => (activeId ? sweepSensitivity(nodes, demand, activeId, param) : null),
-    [nodes, demand, activeId, param],
+    () => (activeId ? sweepSensitivity(nodes, demand, activeId, param, 25, calibration) : null),
+    [nodes, demand, activeId, param, calibration],
   )
 
   const data = useMemo(

@@ -2,7 +2,8 @@ import { useMemo, useRef, useState } from 'react'
 import { Footprints, Forklift, ImagePlus, MousePointer2, Route as RouteIcon, Square, Trash2, Bot, X } from 'lucide-react'
 import { useApp } from '../../store'
 import { isProcessKind } from '../../lib/analytics'
-import { computeSpaghettiSummary, computeTransportAudit, fmtMoney, TRANSPORT_PROFILES } from '../../lib/spaghetti'
+import { transportProfiles } from '../../lib/calibration'
+import { computeSpaghettiSummary, computeTransportAudit, fmtMoney } from '../../lib/spaghetti'
 import { NumberField, Section, Stat, TextField } from '../ui'
 import type { TransportMode } from '../../types'
 
@@ -24,9 +25,11 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
   const selectedZoneId = useApp((s) => s.selectedZoneId)
   const selectedRouteId = useApp((s) => s.selectedRouteId)
 
+  const calibration = useApp((s) => s.calibration)
+  const profiles = useMemo(() => transportProfiles(calibration), [calibration])
   const summary = useMemo(
-    () => computeSpaghettiSummary(spaghetti, demand.shiftsPerDay, demand.daysPerYear),
-    [spaghetti, demand.shiftsPerDay, demand.daysPerYear],
+    () => computeSpaghettiSummary(spaghetti, demand.shiftsPerDay, demand.daysPerYear, calibration),
+    [spaghetti, demand.shiftsPerDay, demand.daysPerYear, calibration],
   )
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -124,12 +127,12 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
             <RouteIcon size={13} /> Route
           </ToolButton>
           <div className="mx-2 h-5 w-px bg-edge" />
-          {(Object.keys(TRANSPORT_PROFILES) as TransportMode[]).map((m) => {
-            const p = TRANSPORT_PROFILES[m]
+          {(Object.keys(profiles) as TransportMode[]).map((m) => {
+            const p = profiles[m]
             const Icon = MODE_ICON[m]
             return (
               <ToolButton key={m} active={routeMode === m} onClick={() => useApp.getState().setRouteMode(m)}
-                title={`${p.label} — $${p.costPerMeter.toFixed(2)}/m @ ${p.speedMps} m/s`}>
+                title={`${p.label} — ${calibration.currency}${p.costPerMeter.toFixed(2)}/m @ ${p.speedMps} m/s`}>
                 <Icon size={13} style={{ color: p.color }} /> {p.label.split(' ')[0]}
               </ToolButton>
             )
@@ -200,7 +203,7 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
             ))}
 
             {spaghetti.routes.map((r) => {
-              const p = TRANSPORT_PROFILES[r.mode]
+              const p = profiles[r.mode]
               const d = `M ${r.points.map((pt) => `${pt.x} ${pt.y}`).join(' L ')}`
               const width = 1.5 + Math.min(6, r.tripsPerShift / 6)
               const selected = selectedRouteId === r.id
@@ -242,9 +245,9 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
               <g pointerEvents="none">
                 <path
                   d={`M ${draft.map((pt) => `${pt.x} ${pt.y}`).join(' L ')}${hover ? ` L ${hover.x} ${hover.y}` : ''}`}
-                  fill="none" stroke={TRANSPORT_PROFILES[routeMode].color} strokeWidth={2} strokeDasharray="6 5" />
+                  fill="none" stroke={profiles[routeMode].color} strokeWidth={2} strokeDasharray="6 5" />
                 {draft.map((pt, i) => (
-                  <circle key={i} cx={pt.x} cy={pt.y} r={3.5} fill={TRANSPORT_PROFILES[routeMode].color} />
+                  <circle key={i} cx={pt.x} cy={pt.y} r={3.5} fill={profiles[routeMode].color} />
                 ))}
               </g>
             )}
@@ -262,10 +265,10 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
         <div className="flex shrink-0 items-stretch gap-2 border-t border-edge bg-panel p-2 overflow-x-auto">
           <Stat label="Travel / shift" value={`${Math.round(summary.totalMetersPerShift).toLocaleString()} m`} tone="flow" />
           <Stat label="Time / shift" value={`${summary.totalMinutesPerShift.toFixed(0)} min`} />
-          <Stat label="Cost / shift" value={fmtMoney(summary.totalCostPerShift)} tone="warn" />
-          <Stat label="Cost / year" value={fmtMoney(summary.totalCostPerYear)} tone="crit"
+          <Stat label="Cost / shift" value={fmtMoney(summary.totalCostPerShift, calibration.currency)} tone="warn" />
+          <Stat label="Cost / year" value={fmtMoney(summary.totalCostPerYear, calibration.currency)} tone="crit"
             sub={`${demand.shiftsPerDay} shifts × ${demand.daysPerYear} days`} />
-          <Stat label="Best-mode ROI" value={fmtMoney(summary.bestModeSavingPerYear)} tone="good" sub="potential saving / year" />
+          <Stat label="Best-mode ROI" value={fmtMoney(summary.bestModeSavingPerYear, calibration.currency)} tone="good" sub="potential saving / year" />
         </div>
       </div>
 
@@ -283,8 +286,8 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
             <TextField label="Name" value={selectedRoute.name} onChange={(name) => useApp.getState().updateRoute(selectedRoute.id, { name })} />
             <div className="space-y-1">
               <span className="field-label">Transport mode</span>
-              {(Object.keys(TRANSPORT_PROFILES) as TransportMode[]).map((m) => {
-                const p = TRANSPORT_PROFILES[m]
+              {(Object.keys(profiles) as TransportMode[]).map((m) => {
+                const p = profiles[m]
                 return (
                   <button key={m}
                     className={`block w-full rounded-md border px-2 py-1.5 text-left text-xs transition-colors ${
@@ -292,7 +295,7 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
                     }`}
                     onClick={() => useApp.getState().updateRoute(selectedRoute.id, { mode: m })}>
                     <span style={{ color: p.color }}>●</span> {p.label}
-                    <span className="float-right font-mono text-slate-500">${p.costPerMeter.toFixed(2)}/m</span>
+                    <span className="float-right font-mono text-slate-500">{calibration.currency}{p.costPerMeter.toFixed(2)}/m</span>
                   </button>
                 )
               })}
@@ -471,13 +474,14 @@ function FloorPlanPanel() {
 function RouteReadout({ routeId }: { routeId: string }) {
   const spaghetti = useApp((s) => s.spaghetti)
   const demand = useApp((s) => s.demand)
+  const calibration = useApp((s) => s.calibration)
   const summary = useMemo(
-    () => computeSpaghettiSummary(spaghetti, demand.shiftsPerDay, demand.daysPerYear),
-    [spaghetti, demand.shiftsPerDay, demand.daysPerYear],
+    () => computeSpaghettiSummary(spaghetti, demand.shiftsPerDay, demand.daysPerYear, calibration),
+    [spaghetti, demand.shiftsPerDay, demand.daysPerYear, calibration],
   )
   const audit = useMemo(
-    () => computeTransportAudit(spaghetti, demand.unitsPerDay / Math.max(1, demand.shiftsPerDay)),
-    [spaghetti, demand.unitsPerDay, demand.shiftsPerDay],
+    () => computeTransportAudit(spaghetti, demand.unitsPerDay / Math.max(1, demand.shiftsPerDay), calibration),
+    [spaghetti, demand.unitsPerDay, demand.shiftsPerDay, calibration],
   )
   const m = summary.routes.find((r) => r.routeId === routeId)
   if (!m) return null
@@ -486,10 +490,10 @@ function RouteReadout({ routeId }: { routeId: string }) {
     ['One-way distance', `${m.meters.toFixed(1)} m`],
     ['Steps (if walked)', m.steps > 0 ? String(m.steps) : '—'],
     ['Travel time / shift', `${m.minutesPerShift.toFixed(1)} min`],
-    ['Cost / shift', fmtMoney(m.costPerShift)],
-    ['Cost / year', fmtMoney(m.costPerYear)],
+    ['Cost / shift', fmtMoney(m.costPerShift, calibration.currency)],
+    ['Cost / year', fmtMoney(m.costPerYear, calibration.currency)],
     ...(perPart
-      ? ([['Transport / part', `${perPart.secondsPerPart.toFixed(1)} s · $${perPart.costPerPart.toFixed(3)}`]] as [string, string][])
+      ? ([['Transport / part', `${perPart.secondsPerPart.toFixed(1)} s · ${calibration.currency}${perPart.costPerPart.toFixed(3)}`]] as [string, string][])
       : []),
   ]
   return (

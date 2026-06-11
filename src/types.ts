@@ -249,6 +249,49 @@ export interface RouteMetrics {
 }
 
 // ---------------------------------------------------------------------------
+// Calibration (per-project customization of every model assumption)
+// ---------------------------------------------------------------------------
+
+/** Thresholds that trigger canvas flags and alert rows. */
+export interface AlertThresholds {
+  /** SMED flag when setup penalty > factor × CT nominal. */
+  smedFactor: number
+  /** Quality warning when scrap rate ≥ this ratio. */
+  scrapWarn: number
+  /** Availability warning when OEE-A < this ratio. */
+  availabilityWarn: number
+  /** Inventory note when coverage exceeds this many days of demand. */
+  inventoryDaysWarn: number
+  /** Flow-opportunity note when PCE falls below this percentage. */
+  pceLowPct: number
+}
+
+/** Tunable economics of a transport mode (label & color stay built-in). */
+export interface TransportCalibration {
+  costPerMeter: number
+  speedMps: number
+}
+
+export type BenchmarkKey = 'pce' | 'availability' | 'fpy' | 'inventory' | 'setup' | 'capacity'
+
+/** Reference band one KPI is scored against. */
+export interface BenchmarkTargetCalibration {
+  typical: number
+  worldClass: number
+}
+
+/** Every assumption of the suite, calibratable per project. */
+export interface CalibrationConfig {
+  /** Currency symbol used across costs and reports. */
+  currency: string
+  /** Average walking step length, meters (spaghetti step counts). */
+  stepMeters: number
+  alerts: AlertThresholds
+  transport: Record<TransportMode, TransportCalibration>
+  benchmarks: Record<BenchmarkKey, BenchmarkTargetCalibration>
+}
+
+// ---------------------------------------------------------------------------
 // Scenario workbench (multivariable sandbox)
 // ---------------------------------------------------------------------------
 
@@ -276,6 +319,8 @@ export interface VsmProject {
   spaghetti: SpaghettiState
   /** Saved what-if scenarios (optional — absent in early v1 files). */
   scenarios?: Scenario[]
+  /** Model calibration (optional — defaults are merged in on import). */
+  calibration?: CalibrationConfig
 }
 
 // ---------------------------------------------------------------------------

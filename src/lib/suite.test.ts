@@ -141,3 +141,98 @@ describe('executive report', () => {
     expect(html).toContain('Setup penalty') // dictionary term in appendix
   })
 })
+
+describe('calibration', () => {
+  it('merges partial or missing configs onto factory defaults', async () => {
+    const { mergeCalibration, DEFAULT_CALIBRATION } = await import('./calibration')
+    expect(mergeCalibration()).toEqual(DEFAULT_CALIBRATION)
+    const merged = mergeCalibration({
+      currency: '€',
+      alerts: { scrapWarn: 0.1 },
+      transport: { walk: { costPerMeter: 0.5 } },
+      benchmarks: { pce: { worldClass: 40 } },
+    })
+    expect(merged.currency).toBe('€')
+    expect(merged.alerts.scrapWarn).toBeCloseTo(0.1)
+    expect(merged.alerts.availabilityWarn).toBeCloseTo(0.7) // default kept
+    expect(merged.transport.walk.costPerMeter).toBeCloseTo(0.5)
+    expect(merged.transport.walk.speedMps).toBeCloseTo(1.2) // default kept
+    expect(merged.transport.forklift).toEqual(DEFAULT_CALIBRATION.transport.forklift)
+    expect(merged.benchmarks.pce).toEqual({ typical: 2, worldClass: 40 })
+  })
+
+  it('alert thresholds drive which flags fire', async () => {
+    const { mergeCalibration } = await import('./calibration')
+    const node: VsmNode = { ...station, scrap: 0.04, availability: 0.75, setup: 0 }
+    const loose = computeSystemMetrics([node], demand) // defaults: 4% scrap < 5%, 75% ≥ 70%
+    expect(loose.alerts.filter((a) => a.id.startsWith('scrap-'))).toHaveLength(0)
+    expect(loose.alerts.filter((a) => a.id.startsWith('oee-'))).toHaveLength(0)
+    const strict = computeSystemMetrics(
+      [node],
+      demand,
+      mergeCalibration({ alerts: { scrapWarn: 0.02, availabilityWarn: 0.8 } }),
+    )
+    expect(strict.alerts.some((a) => a.id === `scrap-${node.id}`)).toBe(true)
+    expect(strict.alerts.some((a) => a.id === `oee-${node.id}`)).toBe(true)
+  })
+
+  it('SMED factor calibrates the setup flag', async () => {
+    const { mergeCalibration } = await import('./calibration')
+    // setup penalty = 600/100 = 6s on a 60s CT → 10% share
+    const def = computeSystemMetrics([station], demand)
+    expect(def.processes[0].smedAlert).toBe(false) // 6 < 0.5 × 60
+    const tight = computeSystemMetrics([station], demand, mergeCalibration({ alerts: { smedFactor: 0.05 } }))
+    expect(tight.processes[0].smedAlert).toBe(true) // 6 > 0.05 × 60
+  })
+
+  it('transport cost calibration reprices routes and audits', async () => {
+    const { mergeCalibration } = await import('./calibration')
+    const floor: SpaghettiState = {
+      metersPerUnit: 0.5,
+      zones: [],
+      routes: [{
+        id: 'r1', name: 'R', mode: 'walk', tripsPerShift: 10,
+        points: [{ x: 0, y: 0 }, { x: 100, y: 0 }], linkedNodeId: 'p1',
+      }],
+    }
+    const cal = mergeCalibration({ transport: { walk: { costPerMeter: 0.3, speedMps: 2.4 } } })
+    const summary = computeSpaghettiSummary(floor, 2, 240, cal)
+    expect(summary.routes[0].costPerShift).toBeCloseTo(1000 * 0.3) // 1000 m/shift × $0.30
+    const audit = computeTransportAudit(floor, 100, cal)
+    expect(audit.rows[0].secondsPerPart).toBeCloseTo(1000 / 2.4 / 100) // calibrated speed
+  })
+
+  it('benchmark bands recalibrate scores and grade', async () => {
+    const { mergeCalibration } = await import('./calibration')
+    const m = computeSystemMetrics([{ ...station, availability: 0.8 }], demand)
+    const defRow = computeBenchmarks(m).find((r) => r.key === 'availability')!
+    // band 75→90: 80% scores 33
+    expect(defRow.score).toBeCloseTo(((80 - 75) / 15) * 100, 0)
+    const cal = mergeCalibration({ benchmarks: { availability: { typical: 60, worldClass: 80 } } })
+    const calRow = computeBenchmarks(m, cal).find((r) => r.key === 'availability')!
+    expect(calRow.score).toBeCloseTo(100) // 80% hits the calibrated world class
+  })
+
+  it('report renders the calibration in force with its currency', async () => {
+    const { mergeCalibration } = await import('./calibration')
+    const cal = mergeCalibration({ currency: '€', alerts: { inventoryDaysWarn: 3 } })
+    const nodes: VsmNode[] = [station]
+    const project: VsmProject = {
+      schema: 'vstream/v1', name: 'Cal plant', savedAt: new Date().toISOString(),
+      nodes, edges: [], demand,
+      spaghetti: { metersPerUnit: 0.5, zones: [], routes: [] },
+      calibration: cal,
+    }
+    const metrics = computeSystemMetrics(nodes, demand, cal)
+    const benchmarks = computeBenchmarks(metrics, cal)
+    const html = buildHtmlReport({
+      project, metrics, benchmarks, grade: overallGrade(benchmarks),
+      spaghetti: computeSpaghettiSummary(project.spaghetti, 2, 240, cal),
+      transport: computeTransportAudit(project.spaghetti, 100, cal),
+      suggestions: [], calibration: cal,
+    })
+    expect(html).toContain('Model calibration in force')
+    expect(html).toContain('coverage &gt; 3 days')
+    expect(html).toContain('€1.20/m') // forklift default priced in calibrated currency
+  })
+})

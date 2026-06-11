@@ -1,12 +1,9 @@
-import type { RouteMetrics, SpaghettiState, TransportMode, TransportProfile, TravelRoute } from '../types'
+import { DEFAULT_CALIBRATION, transportProfiles } from './calibration'
+import type { CalibrationConfig, RouteMetrics, SpaghettiState, TransportMode, TransportProfile, TravelRoute } from '../types'
 
-export const TRANSPORT_PROFILES: Record<TransportMode, TransportProfile> = {
-  walk: { mode: 'walk', label: 'Manual walk', costPerMeter: 0.15, speedMps: 1.2, color: '#FBBF24' },
-  forklift: { mode: 'forklift', label: 'Forklift carrier', costPerMeter: 1.2, speedMps: 3.0, color: '#F87171' },
-  agv: { mode: 'agv', label: 'AGV routing', costPerMeter: 0.4, speedMps: 1.7, color: '#22D3EE' },
-}
-
-const AVG_STEP_METERS = 0.75
+/** Factory-default display profiles; pass a calibration for project-tuned ones. */
+export const TRANSPORT_PROFILES: Record<TransportMode, TransportProfile> =
+  transportProfiles(DEFAULT_CALIBRATION)
 
 export function polylineLength(points: { x: number; y: number }[]): number {
   let len = 0
@@ -23,8 +20,9 @@ export function computeRouteMetrics(
   metersPerUnit: number,
   shiftsPerDay: number,
   daysPerYear: number,
+  cal: CalibrationConfig = DEFAULT_CALIBRATION,
 ): RouteMetrics {
-  const profile = TRANSPORT_PROFILES[route.mode]
+  const profile = transportProfiles(cal)[route.mode]
   // A trip covers the route out and back.
   const metersOneWay = polylineLength(route.points) * metersPerUnit
   const metersPerShift = metersOneWay * 2 * Math.max(0, route.tripsPerShift)
@@ -34,7 +32,7 @@ export function computeRouteMetrics(
     name: route.name,
     mode: route.mode,
     meters: metersOneWay,
-    steps: route.mode === 'walk' ? Math.round(metersOneWay / AVG_STEP_METERS) : 0,
+    steps: route.mode === 'walk' ? Math.round(metersOneWay / Math.max(0.1, cal.stepMeters)) : 0,
     minutesPerShift: profile.speedMps > 0 ? metersPerShift / profile.speedMps / 60 : 0,
     costPerShift,
     costPerYear: costPerShift * shiftsPerDay * daysPerYear,
@@ -67,12 +65,17 @@ export interface TransportAudit {
  * over the parts produced per shift — transport waste expressed per part,
  * directly comparable to a station's cycle time.
  */
-export function computeTransportAudit(state: SpaghettiState, partsPerShift: number): TransportAudit {
+export function computeTransportAudit(
+  state: SpaghettiState,
+  partsPerShift: number,
+  cal: CalibrationConfig = DEFAULT_CALIBRATION,
+): TransportAudit {
   const rows: TransportAuditRow[] = []
+  const profiles = transportProfiles(cal)
   if (partsPerShift > 0) {
     for (const route of state.routes) {
       if (!route.linkedNodeId) continue
-      const profile = TRANSPORT_PROFILES[route.mode]
+      const profile = profiles[route.mode]
       const metersPerShift = polylineLength(route.points) * state.metersPerUnit * 2 * Math.max(0, route.tripsPerShift)
       rows.push({
         routeId: route.id,
@@ -105,12 +108,13 @@ export function computeSpaghettiSummary(
   state: SpaghettiState,
   shiftsPerDay: number,
   daysPerYear: number,
+  cal: CalibrationConfig = DEFAULT_CALIBRATION,
 ): SpaghettiSummary {
   const pairs = state.routes.map((route) => ({
     route,
-    metrics: computeRouteMetrics(route, state.metersPerUnit, shiftsPerDay, daysPerYear),
+    metrics: computeRouteMetrics(route, state.metersPerUnit, shiftsPerDay, daysPerYear, cal),
   }))
-  const cheapest = Math.min(...Object.values(TRANSPORT_PROFILES).map((p) => p.costPerMeter))
+  const cheapest = Math.min(...Object.values(transportProfiles(cal)).map((p) => p.costPerMeter))
   const bestModeSavingPerYear = pairs.reduce((s, { route, metrics }) => {
     const bestCost = metrics.meters * 2 * route.tripsPerShift * cheapest * shiftsPerDay * daysPerYear
     return s + Math.max(0, metrics.costPerYear - bestCost)
@@ -125,9 +129,9 @@ export function computeSpaghettiSummary(
   }
 }
 
-export function fmtMoney(v: number): string {
+export function fmtMoney(v: number, currency = '$'): string {
   if (!Number.isFinite(v)) return '—'
-  if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-  if (Math.abs(v) >= 10_000) return `$${(v / 1000).toFixed(1)}k`
-  return `$${v.toFixed(v < 100 ? 2 : 0)}`
+  if (Math.abs(v) >= 1_000_000) return `${currency}${(v / 1_000_000).toFixed(2)}M`
+  if (Math.abs(v) >= 10_000) return `${currency}${(v / 1000).toFixed(1)}k`
+  return `${currency}${v.toFixed(v < 100 ? 2 : 0)}`
 }

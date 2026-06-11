@@ -24,8 +24,9 @@ export function VsmCanvas({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }
   const connectFrom = useApp((s) => s.connectFrom)
   const selectedNodeId = useApp((s) => s.selectedNodeId)
   const selectedEdgeId = useApp((s) => s.selectedEdgeId)
+  const calibration = useApp((s) => s.calibration)
 
-  const metrics = useMemo(() => computeSystemMetrics(nodes, demand), [nodes, demand])
+  const metrics = useMemo(() => computeSystemMetrics(nodes, demand, calibration), [nodes, demand, calibration])
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState<ViewTransform>({ x: 0, y: 0, k: 0.72 })

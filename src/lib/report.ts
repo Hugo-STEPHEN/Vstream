@@ -1,10 +1,11 @@
 import { DEFINITIONS, DEFINITION_CATEGORIES } from '../data/definitions'
 import { fmtSeconds } from './analytics'
+import { DEFAULT_CALIBRATION, transportProfiles } from './calibration'
 import { download } from './exporters'
 import { fmtMoney, type SpaghettiSummary, type TransportAudit } from './spaghetti'
 import type { BenchmarkRow } from './benchmarks'
 import type { KaizenSuggestion } from './copilot'
-import type { SystemMetrics, VsmProject } from '../types'
+import type { CalibrationConfig, SystemMetrics, TransportMode, VsmProject } from '../types'
 
 export interface ReportInput {
   project: VsmProject
@@ -14,6 +15,7 @@ export interface ReportInput {
   spaghetti: SpaghettiSummary
   transport: TransportAudit
   suggestions: KaizenSuggestion[]
+  calibration?: CalibrationConfig
 }
 
 const esc = (s: string): string =>
@@ -39,6 +41,8 @@ function table(headers: string[], rows: (string | number)[][]): string {
  */
 export function buildHtmlReport(input: ReportInput): string {
   const { project, metrics: m, benchmarks, grade, spaghetti, transport, suggestions } = input
+  const cal = input.calibration ?? DEFAULT_CALIBRATION
+  const cur = cal.currency
   const generated = new Date().toLocaleString()
 
   const kpis: [string, string][] = [
@@ -98,16 +102,34 @@ export function buildHtmlReport(input: ReportInput): string {
     r.mode,
     `${r.meters.toFixed(0)} m`,
     `${r.minutesPerShift.toFixed(1)} min`,
-    fmtMoney(r.costPerShift),
-    fmtMoney(r.costPerYear),
+    fmtMoney(r.costPerShift, cur),
+    fmtMoney(r.costPerYear, cur),
   ])
 
   const transportRows = transport.rows.map((r) => [
     r.routeName,
     r.mode,
     `${r.secondsPerPart.toFixed(1)} s/part`,
-    `$${r.costPerPart.toFixed(3)}/part`,
+    `${cur}${r.costPerPart.toFixed(3)}/part`,
   ])
+
+  const calProfiles = transportProfiles(cal)
+  const calibrationRows: (string | number)[][] = [
+    ['SMED flag', `setup penalty > ${cal.alerts.smedFactor} × CT nominal`],
+    ['Scrap warning', `SR ≥ ${Math.round(cal.alerts.scrapWarn * 100)}%`],
+    ['Availability warning', `A < ${Math.round(cal.alerts.availabilityWarn * 100)}%`],
+    ['Inventory note', `coverage > ${cal.alerts.inventoryDaysWarn} days`],
+    ['Low-PCE note', `PCE < ${cal.alerts.pceLowPct}%`],
+    ...(['walk', 'forklift', 'agv'] as TransportMode[]).map((mode): (string | number)[] => [
+      calProfiles[mode].label,
+      `${cur}${cal.transport[mode].costPerMeter.toFixed(2)}/m @ ${cal.transport[mode].speedMps} m/s`,
+    ]),
+    ['Walking step length', `${cal.stepMeters} m`],
+    ...benchmarks.map((b): (string | number)[] => [
+      `Benchmark band — ${b.metric}`,
+      `typical ${b.typical} ${b.unit} → world class ${b.worldClass} ${b.unit}`,
+    ]),
+  ]
 
   const definitionSections = DEFINITION_CATEGORIES.map((cat) => {
     const rows = DEFINITIONS.filter((d) => d.category === cat).map((d) => [d.term, d.formula, d.unit, d.definition])
@@ -168,12 +190,16 @@ export function buildHtmlReport(input: ReportInput): string {
 
   <h2>Spaghetti economics</h2>
   ${routeRows.length ? table(['Route', 'Mode', 'One-way', 'Travel/shift', 'Cost/shift', 'Cost/year'], routeRows) : '<p>No routes drawn.</p>'}
-  <p>Total ${fmtMoney(spaghetti.totalCostPerShift)}/shift · ${fmtMoney(spaghetti.totalCostPerYear)}/year ·
-     best-mode ROI ${fmtMoney(spaghetti.bestModeSavingPerYear)}/year.</p>
-  ${transportRows.length ? `<h3>Transport waste per part (routes linked to VSM stations)</h3>${table(['Route', 'Mode', 'Time/part', 'Cost/part'], transportRows)}<p>Total conveyance: ${transport.totalSecondsPerPart.toFixed(1)} s and $${transport.totalCostPerPart.toFixed(3)} per produced part.</p>` : ''}
+  <p>Total ${fmtMoney(spaghetti.totalCostPerShift, cur)}/shift · ${fmtMoney(spaghetti.totalCostPerYear, cur)}/year ·
+     best-mode ROI ${fmtMoney(spaghetti.bestModeSavingPerYear, cur)}/year.</p>
+  ${transportRows.length ? `<h3>Transport waste per part (routes linked to VSM stations)</h3>${table(['Route', 'Mode', 'Time/part', 'Cost/part'], transportRows)}<p>Total conveyance: ${transport.totalSecondsPerPart.toFixed(1)} s and ${cur}${transport.totalCostPerPart.toFixed(3)} per produced part.</p>` : ''}
 
   <h2>ESG (E-VSM)</h2>
   ${table(['Energy', 'CO₂e', 'Scrap units', 'Scrap mass'], [[`${m.esg.kwhPerDay.toFixed(0)} kWh/day`, `${m.esg.co2KgPerDay.toFixed(0)} kg/day`, `${m.esg.scrapUnitsPerDay.toFixed(0)} u/day`, `${m.esg.scrapKgPerDay.toFixed(0)} kg/day`]])}
+
+  <h2>Model calibration in force</h2>
+  ${table(['Assumption', 'Calibrated value'], calibrationRows)}
+  <p>All flags, costs and scores in this report were computed with these settings (tunable in-app).</p>
 
   <h2>Appendix — need definitions & formulas</h2>
   ${definitionSections}

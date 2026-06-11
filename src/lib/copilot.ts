@@ -1,5 +1,6 @@
 import { computeSystemMetrics } from './analytics'
-import type { DemandConfig, SystemMetrics, VsmNode } from '../types'
+import { DEFAULT_CALIBRATION } from './calibration'
+import type { CalibrationConfig, DemandConfig, SystemMetrics, VsmNode } from '../types'
 
 export interface KaizenSuggestion {
   id: string
@@ -26,6 +27,7 @@ export function generateKaizenSuggestions(
   nodes: VsmNode[],
   demand: DemandConfig,
   base: SystemMetrics,
+  cal: CalibrationConfig = DEFAULT_CALIBRATION,
 ): KaizenSuggestion[] {
   const out: KaizenSuggestion[] = []
 
@@ -37,7 +39,7 @@ export function generateKaizenSuggestions(
     patch: Partial<VsmNode>,
   ): void => {
     const clone = nodes.map((n) => (n.id === nodeId ? { ...n, ...patch } : { ...n }))
-    const after = computeSystemMetrics(clone, demand)
+    const after = computeSystemMetrics(clone, demand, cal)
     const pceDelta = after.pce - base.pce
     const leadTimeDelta = after.leadTimeSeconds - base.leadTimeSeconds
     // Keep only countermeasures that actually move the system.

@@ -4,7 +4,7 @@ import { useApp } from '../../store'
 import { computeSystemMetrics, fmtSeconds } from '../../lib/analytics'
 import { computeBenchmarks, overallGrade } from '../../lib/benchmarks'
 import { Badge, Section } from '../ui'
-import type { DemandConfig, SystemMetrics, VsmNode } from '../../types'
+import type { CalibrationConfig, DemandConfig, SystemMetrics, VsmNode } from '../../types'
 
 interface ScenarioRow {
   id: string | null
@@ -14,9 +14,16 @@ interface ScenarioRow {
   grade: string
 }
 
-function row(id: string | null, name: string, nodes: VsmNode[], demand: DemandConfig, savedAt?: string): ScenarioRow {
-  const metrics = computeSystemMetrics(nodes, demand)
-  return { id, name, savedAt, metrics, grade: overallGrade(computeBenchmarks(metrics)).grade }
+function row(
+  id: string | null,
+  name: string,
+  nodes: VsmNode[],
+  demand: DemandConfig,
+  cal: CalibrationConfig,
+  savedAt?: string,
+): ScenarioRow {
+  const metrics = computeSystemMetrics(nodes, demand, cal)
+  return { id, name, savedAt, metrics, grade: overallGrade(computeBenchmarks(metrics, cal)).grade }
 }
 
 /**
@@ -28,14 +35,15 @@ export function ScenarioBar() {
   const nodes = useApp((s) => s.nodes)
   const demand = useApp((s) => s.demand)
   const scenarios = useApp((s) => s.scenarios)
+  const calibration = useApp((s) => s.calibration)
   const [name, setName] = useState('')
 
   const rows = useMemo<ScenarioRow[]>(
     () => [
-      row(null, 'Current model', nodes, demand),
-      ...scenarios.map((sc) => row(sc.id, sc.name, sc.nodes, sc.demand, sc.savedAt)),
+      row(null, 'Current model', nodes, demand, calibration),
+      ...scenarios.map((sc) => row(sc.id, sc.name, sc.nodes, sc.demand, calibration, sc.savedAt)),
     ],
-    [nodes, demand, scenarios],
+    [nodes, demand, scenarios, calibration],
   )
   const base = rows[0].metrics
 

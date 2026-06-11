@@ -16,16 +16,17 @@ export function AnalyticsView() {
   const nodes = useApp((s) => s.nodes)
   const demand = useApp((s) => s.demand)
   const spaghetti = useApp((s) => s.spaghetti)
+  const calibration = useApp((s) => s.calibration)
   const updateNode = useApp((s) => s.updateNode)
 
-  const metrics = useMemo(() => computeSystemMetrics(nodes, demand), [nodes, demand])
+  const metrics = useMemo(() => computeSystemMetrics(nodes, demand, calibration), [nodes, demand, calibration])
   const transport = useMemo(
-    () => computeTransportAudit(spaghetti, demand.unitsPerDay / Math.max(1, demand.shiftsPerDay)),
-    [spaghetti, demand.unitsPerDay, demand.shiftsPerDay],
+    () => computeTransportAudit(spaghetti, demand.unitsPerDay / Math.max(1, demand.shiftsPerDay), calibration),
+    [spaghetti, demand.unitsPerDay, demand.shiftsPerDay, calibration],
   )
   const suggestions = useMemo(
-    () => generateKaizenSuggestions(nodes, demand, metrics),
-    [nodes, demand, metrics],
+    () => generateKaizenSuggestions(nodes, demand, metrics, calibration),
+    [nodes, demand, metrics, calibration],
   )
 
   const chartData = metrics.processes.map((p) => ({
@@ -54,7 +55,7 @@ export function AnalyticsView() {
           sub={`≈ $${Math.round(metrics.totalOperators * demand.laborRatePerHour * (metrics.availableSecondsPerDay / 3600)).toLocaleString()}/day`} />
         {transport.rows.length > 0 && (
           <Stat label="Transport / part" value={fmtSeconds(transport.totalSecondsPerPart)} tone="warn"
-            sub={`$${transport.totalCostPerPart.toFixed(2)}/part conveyance`} />
+            sub={`${calibration.currency}${transport.totalCostPerPart.toFixed(2)}/part conveyance`} />
         )}
       </div>
 
@@ -215,7 +216,7 @@ export function AnalyticsView() {
                     </td>
                     <td className="py-1 pr-2 text-slate-400">{r.mode}</td>
                     <td className="py-1 pr-2 text-warn">{r.secondsPerPart.toFixed(1)}s</td>
-                    <td className="py-1 text-slate-300">${r.costPerPart.toFixed(3)}</td>
+                    <td className="py-1 text-slate-300">{calibration.currency}{r.costPerPart.toFixed(3)}</td>
                   </tr>
                 ))}
               </tbody>

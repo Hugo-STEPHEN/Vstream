@@ -10,8 +10,9 @@ import { Section } from '../ui'
 export function BenchmarkView() {
   const nodes = useApp((s) => s.nodes)
   const demand = useApp((s) => s.demand)
-  const metrics = useMemo(() => computeSystemMetrics(nodes, demand), [nodes, demand])
-  const rows = useMemo(() => computeBenchmarks(metrics), [metrics])
+  const calibration = useApp((s) => s.calibration)
+  const metrics = useMemo(() => computeSystemMetrics(nodes, demand, calibration), [nodes, demand, calibration])
+  const rows = useMemo(() => computeBenchmarks(metrics, calibration), [metrics, calibration])
   const grade = overallGrade(rows)
 
   const radarData = rows.map((r) => ({

@@ -81,6 +81,22 @@ Two simulation instruments complete the sandbox:
 - **Transport audit** — spaghetti routes linked to VSM stations are allocated per
   produced part, making conveyance muda directly comparable to cycle times.
 
+### Calibration — your plant, your assumptions
+Every built-in assumption is tunable per project (sliders icon in the top bar):
+
+| Knob | Default | Why calibrate |
+|---|---|---|
+| Alert thresholds | SMED > 0.5×CT, scrap ≥ 5%, OEE-A < 70%, inventory > 5 d, PCE < 5% | Match your escalation policy |
+| Transport economics | walk $0.15/m @ 1.2 m/s · forklift $1.20/m @ 3.0 m/s · AGV $0.40/m @ 1.7 m/s | Use loaded local rates |
+| Benchmark bands | Rother/Shook-style typical → world-class per KPI | Score against *your* sector |
+| Currency & step length | `$`, 0.75 m | Sites outside the US, ergonomic step counts |
+
+Calibration is saved in the project file, applied through every engine (flags,
+kaizen, sensitivity, scenarios, spaghetti costs, benchmark grade), printed in the
+executive report ("Model calibration in force"), undoable like any other edit,
+and resettable to factory defaults in one click. Old project files without a
+calibration block import cleanly — defaults are merged in.
+
 ### 4. Benchmarks
 Six lean KPIs scored against *typical batch-and-queue* (0) and *world-class lean*
 (100) references, with a composite A–E grade and positioning radar.
@@ -152,7 +168,8 @@ engine at each of 25 points across one parameter's range — no interpolation.
 
 - **Executive report** `.html` — self-contained, print-to-PDF ready audit: KPI summary,
   station & inventory audits, alerts, kaizen countermeasures, benchmarks with grade,
-  spaghetti economics, transport audit, ESG and the full definitions appendix.
+  spaghetti economics, transport audit, ESG, the calibration in force and the full
+  definitions appendix.
 - **Project file** `.vstream.json` — full model incl. scenarios and floor-plan underlay,
   versioned schema (`vstream/v1`), re-importable.
 - **VSM metrics CSV** — the audited PCE report: every station's CT waterfall, flags, totals.
@@ -176,12 +193,13 @@ engine at each of 25 points across one parameter's range — no interpolation.
 ```
 src/
   types.ts                 Domain model (strict TS, no `any`)
-  store.ts                 Zustand store: project, tools, scenarios, undo/redo, autosave
+  store.ts                 Zustand store: project, tools, scenarios, calibration, undo/redo, autosave
   data/
     definitions.ts         The complete need/metric dictionary (single source of truth)
     palette.ts, demo.ts    Element catalog, Acme demo stream
   lib/
     analytics.ts           Lean math engine (pure, tested)
+    calibration.ts         Tunable assumptions: defaults, merge, transport profiles (tested)
     sensitivity.ts         Single-variable sweep engine (pure, tested)
     spaghetti.ts           Travel distance / cost / ROI + transport audit (tested)
     benchmarks.ts          KPI scoring vs typical & world-class references
@@ -191,6 +209,7 @@ src/
     fuzzy.ts, geometry.ts  Toolbox search, lane clamping
   components/
     HelpModal.tsx          Searchable in-app definitions & shortcuts
+    CalibrationModal.tsx   Thresholds, transport economics, benchmark bands, units
     vsm/                   Canvas, toolbox, inspector, node glyphs
     spaghetti/             Floor studio (image underlay, waypoint editing, VSM links)
     analytics/             Sandbox, scenarios, sensitivity, co-pilot, ESG, connectors
