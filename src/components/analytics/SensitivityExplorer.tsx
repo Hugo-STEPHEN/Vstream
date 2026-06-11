@@ -6,6 +6,7 @@ import { useApp } from '../../store'
 import { isProcessKind } from '../../lib/analytics'
 import { SWEEP_PARAMS, SWEEP_PARAM_BY_KEY, sweepSensitivity, type SweepParam } from '../../lib/sensitivity'
 import { Section } from '../ui'
+import { useT } from '../../i18n'
 
 /**
  * Single-variable sensitivity curves: sweep one station parameter across its
@@ -13,6 +14,7 @@ import { Section } from '../ui'
  * point of the curve.
  */
 export function SensitivityExplorer() {
+  const { t } = useT()
   const nodes = useApp((s) => s.nodes)
   const demand = useApp((s) => s.demand)
   const calibration = useApp((s) => s.calibration)
@@ -49,7 +51,7 @@ export function SensitivityExplorer() {
 
   return (
     <Section
-      title="Sensitivity explorer — single-variable sweep"
+      title={t('ana.sensitivity')}
       right={
         <div className="flex gap-1.5">
           <select className="select-mini" value={activeId} onChange={(e) => setNodeId(e.target.value)}>

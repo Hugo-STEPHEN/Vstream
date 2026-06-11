@@ -1,4 +1,4 @@
-import { DEFINITIONS, DEFINITION_CATEGORIES } from '../data/definitions'
+import { CATEGORY_FR, DEFINITIONS, DEFINITION_CATEGORIES } from '../data/definitions'
 import { fmtSeconds } from './analytics'
 import { DEFAULT_CALIBRATION, transportProfiles } from './calibration'
 import { download } from './exporters'
@@ -43,19 +43,21 @@ export function buildHtmlReport(input: ReportInput): string {
   const { project, metrics: m, benchmarks, grade, spaghetti, transport, suggestions } = input
   const cal = input.calibration ?? DEFAULT_CALIBRATION
   const cur = cal.currency
-  const generated = new Date().toLocaleString()
+  const fr = cal.language === 'fr'
+  const L = (en: string, frs: string): string => (fr ? frs : en)
+  const generated = new Date().toLocaleString(fr ? 'fr-FR' : undefined)
 
   const kpis: [string, string][] = [
-    ['Takt time', fmtSeconds(m.taktSeconds)],
-    ['Demand', `${m.demandPerDay} units/day`],
-    ['System capacity', `${Math.floor(m.systemCapacityPerDay)} units/day`],
-    ['Lead time', days(m.leadTimeSeconds, m.availableSecondsPerDay)],
-    ['Value-add time', fmtSeconds(m.totalValueAddSeconds)],
+    [L('Takt time', 'Temps takt'), fmtSeconds(m.taktSeconds)],
+    [L('Demand', 'Demande'), `${m.demandPerDay} ${L('units/day', 'unités/jour')}`],
+    [L('System capacity', 'Capacité système'), `${Math.floor(m.systemCapacityPerDay)} ${L('units/day', 'unités/jour')}`],
+    [L('Lead time', 'Délai d’écoulement'), days(m.leadTimeSeconds, m.availableSecondsPerDay)],
+    [L('Value-add time', 'Temps à valeur ajoutée'), fmtSeconds(m.totalValueAddSeconds)],
     ['PCE', pct(m.pce, 2)],
-    ['First pass yield', pct(m.firstPassYield * 100)],
-    ['Direct labor', `${m.totalOperators.toFixed(1)} FTE`],
-    ['Bottleneck', m.bottleneck?.label ?? '—'],
-    ['Performance grade', `${grade.grade} (${grade.score.toFixed(0)}/100)`],
+    [L('First pass yield', 'Rendement 1er passage'), pct(m.firstPassYield * 100)],
+    [L('Direct labor', 'Main-d’œuvre directe'), `${m.totalOperators.toFixed(1)} ETP`],
+    [L('Bottleneck', 'Goulot'), m.bottleneck?.label ?? '—'],
+    [L('Performance grade', 'Note de performance'), `${grade.grade} (${grade.score.toFixed(0)}/100)`],
   ]
 
   const stationRows = [...m.processes]
@@ -132,8 +134,16 @@ export function buildHtmlReport(input: ReportInput): string {
   ]
 
   const definitionSections = DEFINITION_CATEGORIES.map((cat) => {
-    const rows = DEFINITIONS.filter((d) => d.category === cat).map((d) => [d.term, d.formula, d.unit, d.definition])
-    return `<h3>${esc(cat)}</h3>${table(['Term', 'Formula', 'Unit', 'Definition'], rows)}`
+    const rows = DEFINITIONS.filter((d) => d.category === cat).map((d) => [
+      fr ? d.termFr ?? d.term : d.term,
+      d.formula,
+      d.unit,
+      fr ? d.definitionFr ?? d.definition : d.definition,
+    ])
+    return `<h3>${esc(fr ? CATEGORY_FR[cat] : cat)}</h3>${table(
+      [L('Term', 'Terme'), L('Formula', 'Formule'), L('Unit', 'Unité'), L('Definition', 'Définition')],
+      rows,
+    )}`
   }).join('\n')
 
   return `<!doctype html>
@@ -168,28 +178,28 @@ export function buildHtmlReport(input: ReportInput): string {
   <p class="meta">vStream value stream intelligence report · generated ${esc(generated)} ·
     ${project.demand.shiftsPerDay} shift(s) × ${project.demand.netMinutesPerShift} net min · ${project.demand.daysPerYear} days/year</p>
 
-  <h2>Executive summary</h2>
+  <h2>${L('Executive summary', 'Synthèse de direction')}</h2>
   <div class="kpis">
     ${kpis.map(([l, v]) => `<div class="kpi"><div class="l">${esc(l)}</div><div class="v">${esc(v)}</div></div>`).join('\n    ')}
   </div>
 
-  <h2>Station audit — grand effective cycle times</h2>
-  ${stationRows.length ? table(['Station', 'CT nominal', 'Avail.', 'Scrap', 'Setup/Batch', 'CT grand', 'Takt load', 'Flags'], stationRows) : '<p>No stations modeled.</p>'}
+  <h2>${L('Station audit — grand effective cycle times', 'Audit des postes — temps de cycle effectifs globaux')}</h2>
+  ${stationRows.length ? table([L('Station', 'Poste'), L('CT nominal', 'TC nominal'), L('Avail.', 'Dispo.'), L('Scrap', 'Rebut'), L('Setup/Batch', 'Chgt/Lot'), L('CT grand', 'TC global'), L('Takt load', 'Charge takt'), L('Flags', 'Drapeaux')], stationRows) : `<p>${L('No stations modeled.', 'Aucun poste modélisé.')}</p>`}
 
-  <h2>Inventory & queues</h2>
-  ${inventoryRows.length ? table(['Queue', 'Qty', 'Coverage', 'Dwell'], inventoryRows) : '<p>No inventory modeled.</p>'}
+  <h2>${L('Inventory & queues', 'Stocks & files d’attente')}</h2>
+  ${inventoryRows.length ? table([L('Queue', 'File'), L('Qty', 'Qté'), L('Coverage', 'Couverture'), L('Dwell', 'Attente')], inventoryRows) : `<p>${L('No inventory modeled.', 'Aucun stock modélisé.')}</p>`}
 
-  <h2>Active alerts</h2>
-  ${alertRows.length ? table(['Level', 'Alert', 'Detail'], alertRows) : '<p>No active flags — the stream meets takt with current parameters.</p>'}
+  <h2>${L('Active alerts', 'Alertes actives')}</h2>
+  ${alertRows.length ? table([L('Level', 'Niveau'), L('Alert', 'Alerte'), L('Detail', 'Détail')], alertRows) : `<p>${L('No active flags — the stream meets takt with current parameters.', 'Aucune alerte — le flux tient le takt avec les paramètres actuels.')}</p>`}
 
-  <h2>Kaizen countermeasures (simulated impact)</h2>
-  ${kaizenRows.length ? table(['Action', 'PCE impact', 'Lead time', 'Capacity after'], kaizenRows) : '<p>No high-leverage countermeasure found.</p>'}
+  <h2>${L('Kaizen countermeasures (simulated impact)', 'Contre-mesures kaizen (impact simulé)')}</h2>
+  ${kaizenRows.length ? table([L('Action', 'Action'), L('PCE impact', 'Impact PCE'), L('Lead time', 'Délai'), L('Capacity after', 'Capacité après')], kaizenRows) : `<p>${L('No high-leverage countermeasure found.', 'Aucune contre-mesure à fort levier trouvée.')}</p>`}
 
-  <h2>Benchmark position <span class="grade">${esc(grade.grade)}</span>${grade.score.toFixed(0)} / 100</h2>
-  ${table(['Metric', 'Current', 'Typical', 'World class', 'Score'], benchmarkRows)}
+  <h2>${L('Benchmark position', 'Position benchmark')} <span class="grade">${esc(grade.grade)}</span>${grade.score.toFixed(0)} / 100</h2>
+  ${table([L('Metric', 'Indicateur'), L('Current', 'Actuel'), L('Typical', 'Typique'), L('World class', 'World class'), L('Score', 'Score')], benchmarkRows)}
 
-  <h2>Spaghetti economics</h2>
-  ${routeRows.length ? table(['Route', 'Mode', 'One-way', 'Travel/shift', 'Cost/shift', 'Cost/year'], routeRows) : '<p>No routes drawn.</p>'}
+  <h2>${L('Spaghetti economics', 'Économie spaghetti')}</h2>
+  ${routeRows.length ? table([L('Route', 'Trajet'), 'Mode', L('One-way', 'Aller'), L('Travel/shift', 'Trajet/équipe'), L('Cost/shift', 'Coût/équipe'), L('Cost/year', 'Coût/an')], routeRows) : `<p>${L('No routes drawn.', 'Aucun trajet tracé.')}</p>`}
   <p>Total ${fmtMoney(spaghetti.totalCostPerShift, cur)}/shift · ${fmtMoney(spaghetti.totalCostPerYear, cur)}/year ·
      best-mode ROI ${fmtMoney(spaghetti.bestModeSavingPerYear, cur)}/year.</p>
   ${transportRows.length ? `<h3>Transport waste per part (routes linked to VSM stations)</h3>${table(['Route', 'Mode', 'Time/part', 'Cost/part'], transportRows)}<p>Total conveyance: ${transport.totalSecondsPerPart.toFixed(1)} s and ${cur}${transport.totalCostPerPart.toFixed(3)} per produced part.</p>` : ''}
@@ -197,11 +207,11 @@ export function buildHtmlReport(input: ReportInput): string {
   <h2>ESG (E-VSM)</h2>
   ${table(['Energy', 'CO₂e', 'Scrap units', 'Scrap mass'], [[`${m.esg.kwhPerDay.toFixed(0)} kWh/day`, `${m.esg.co2KgPerDay.toFixed(0)} kg/day`, `${m.esg.scrapUnitsPerDay.toFixed(0)} u/day`, `${m.esg.scrapKgPerDay.toFixed(0)} kg/day`]])}
 
-  <h2>Model calibration in force</h2>
-  ${table(['Assumption', 'Calibrated value'], calibrationRows)}
+  <h2>${L('Model calibration in force', 'Calibration du modèle en vigueur')}</h2>
+  ${table([L('Assumption', 'Hypothèse'), L('Calibrated value', 'Valeur calibrée')], calibrationRows)}
   <p>All flags, costs and scores in this report were computed with these settings (tunable in-app).</p>
 
-  <h2>Appendix — need definitions & formulas</h2>
+  <h2>${L('Appendix — need definitions & formulas', 'Annexe — définitions des besoins & formules')}</h2>
   ${definitionSections}
 
   <p class="footer">vStream Suite — every figure in this report is recomputed from the model parameters through the

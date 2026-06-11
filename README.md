@@ -23,7 +23,7 @@ exported / re-imported as JSON.
 
 ---
 
-## The four workspaces
+## The five workspaces
 
 ### 1. VSM Studio
 A spatiotemporal canvas split into three enforced lanes:
@@ -44,7 +44,16 @@ Connections: **Push** (striped scheduling arrow), **Pull** (withdrawal loop),
 
 Stations breaching takt pulse red on the canvas; the system bottleneck is flagged amber.
 
-### 2. Spaghetti Studio
+### 2. Rate Analysis — a layer deeper than the VSM
+Double-click any station on the canvas (or use the tab) to drill into its
+**NF E 60-182 performance analysis**: the time cascade from total calendar time
+down to useful time, **TRS (OEE) / TRG / TRE** with live color-graded scores per
+station, the **loss Pareto** (downtime vs speed vs defects, in seconds lost per
+day), the per-part CT waterfall against takt, and theoretical good output.
+Parameters (CT, availability, **performance/allure**, scrap, setup, batch,
+engagement, opening) are edited live — the whole model follows, undoably.
+
+### 3. Spaghetti Studio
 Draw the plant footprint as colored zones — optionally over an **uploaded floor-plan
 image** (CAD export or photo, stored in the project file with adjustable opacity) —
 then trace material travel as routes with three transport profiles:
@@ -61,7 +70,12 @@ best-mode ROI estimate. Line weight scales with traffic intensity. Plant scale
 and **link it to the VSM station it feeds** — linked routes appear in the transport
 audit as conveyance seconds and dollars per produced part.
 
-### 3. Flow Analytics
+Layout tools match real plants: **polygon zones** (click vertices, double-click or
+Enter to close, drag vertices afterwards — m² area computed) for non-rectangular
+footprints, rectangle zones, **pan & cursor-anchored wheel zoom**, and a
+configurable grid.
+
+### 4. Flow Analytics
 The scenario sandbox: station load vs takt with full **loss decomposition**
 (nominal work / availability loss / quality loss / setup penalty), a sortable
 **bottleneck audit** with audited waste per part, the **ESG carbon & waste auditor**
@@ -97,7 +111,16 @@ executive report ("Model calibration in force"), undoable like any other edit,
 and resettable to factory defaults in one click. Old project files without a
 calibration block import cleanly — defaults are merged in.
 
-### 4. Benchmarks
+**Language / Langue** — the entire suite is bilingual **English / Français**
+(top-bar toggle or calibration setting, saved with the project): UI, canvas
+labels, alerts, kaizen suggestions, the data dictionary and the executive
+report all switch. TRS/TRG/TRE terminology follows NF E 60-182.
+
+Further per-user customization: node **accent colors**, VSM grid show/hide +
+**snap-to-grid** with adjustable step, floor-map grid step — view preferences
+persist on the device.
+
+### 5. Benchmarks
 Six lean KPIs scored against *typical batch-and-queue* (0) and *world-class lean*
 (100) references, with a composite A–E grade and positioning radar.
 

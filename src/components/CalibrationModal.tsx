@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useApp } from '../store'
 import { DEFAULT_CALIBRATION, transportProfiles } from '../lib/calibration'
 import { NumberField, TextField } from './ui'
+import { useT } from '../i18n'
 import type { BenchmarkKey, CalibrationConfig, TransportMode } from '../types'
 
 const BENCHMARK_LABELS: Record<BenchmarkKey, { label: string; unit: string }> = {
@@ -20,6 +21,7 @@ const BENCHMARK_LABELS: Record<BenchmarkKey, { label: string; unit: string }> = 
  * applied through every engine, undoable like any other edit.
  */
 export function CalibrationModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useT()
   const cal = useApp((s) => s.calibration)
   const setCalibration = useApp((s) => s.setCalibration)
 
@@ -41,14 +43,14 @@ export function CalibrationModal({ open, onClose }: { open: boolean; onClose: ()
           >
             <header className="flex items-center gap-2 border-b border-edge px-4 py-3">
               <SlidersHorizontal size={16} className="text-flow" />
-              <h2 className="font-display text-sm font-semibold text-white">Model calibration</h2>
-              <span className="text-[10px] text-slate-500">saved with the project · undoable (Ctrl+Z)</span>
+              <h2 className="font-display text-sm font-semibold text-white">{t('cal.title')}</h2>
+              <span className="text-[10px] text-slate-500">{t('cal.subtitle')}</span>
               <button
                 className="btn-ghost ml-auto flex items-center gap-1.5"
                 onClick={() => useApp.getState().resetCalibration()}
                 title="Restore every assumption to factory defaults"
               >
-                <RotateCcw size={12} /> Reset defaults
+                <RotateCcw size={12} /> {t('cal.reset')}
               </button>
               <button className="rounded-md p-1.5 text-slate-400 hover:text-white transition-colors" onClick={onClose} title="Close">
                 <X size={16} />
@@ -58,18 +60,29 @@ export function CalibrationModal({ open, onClose }: { open: boolean; onClose: ()
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
               {/* Units */}
               <section>
-                <h3 className="field-label pb-2">Units & currency</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <TextField label="Currency symbol" value={cal.currency}
+                <h3 className="field-label pb-2">{t('cal.units')}</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  <label className="block space-y-1">
+                    <span className="field-label">{t('cal.language')}</span>
+                    <select
+                      className="select-mini w-full !py-1.5"
+                      value={cal.language}
+                      onChange={(e) => patch({ language: e.target.value === 'fr' ? 'fr' : 'en' })}
+                    >
+                      <option value="en">English</option>
+                      <option value="fr">Français</option>
+                    </select>
+                  </label>
+                  <TextField label={t('cal.currency')} value={cal.currency}
                     onChange={(currency) => patch({ currency: currency.slice(0, 4) || '$' })} />
-                  <NumberField label="Walking step length" unit="m" value={cal.stepMeters} min={0.3} max={1.2} step={0.05}
+                  <NumberField label={t('cal.step')} unit="m" value={cal.stepMeters} min={0.3} max={1.2} step={0.05}
                     onChange={(stepMeters) => patch({ stepMeters })} />
                 </div>
               </section>
 
               {/* Alert thresholds */}
               <section>
-                <h3 className="field-label pb-2">Alert thresholds — when flags fire</h3>
+                <h3 className="field-label pb-2">{t('cal.alerts')}</h3>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   <NumberField label="SMED flag above" unit="× CT nominal" value={cal.alerts.smedFactor} min={0.05} max={2} step={0.05}
                     onChange={(smedFactor) => patch({ alerts: { ...cal.alerts, smedFactor } })} />
@@ -89,7 +102,7 @@ export function CalibrationModal({ open, onClose }: { open: boolean; onClose: ()
 
               {/* Transport modes */}
               <section>
-                <h3 className="field-label pb-2">Transport mode economics</h3>
+                <h3 className="field-label pb-2">{t('cal.transport')}</h3>
                 <div className="space-y-2">
                   {(Object.keys(cal.transport) as TransportMode[]).map((m) => {
                     const display = transportProfiles(cal)[m]
@@ -114,7 +127,7 @@ export function CalibrationModal({ open, onClose }: { open: boolean; onClose: ()
 
               {/* Benchmark references */}
               <section>
-                <h3 className="field-label pb-2">Benchmark reference bands — your industry, your targets</h3>
+                <h3 className="field-label pb-2">{t('cal.bench')}</h3>
                 <div className="overflow-hidden rounded-lg border border-edge">
                   <div className="grid grid-cols-[1fr_110px_110px] gap-2 border-b border-edge bg-ink px-3 py-1.5 text-[10px] uppercase tracking-wider text-slate-500">
                     <span>Metric</span><span>Typical (score 0)</span><span>World class (100)</span>

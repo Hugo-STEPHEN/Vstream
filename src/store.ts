@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { NODE_LANE, PALETTE_BY_KIND } from './data/palette'
 import { createDemoProject, createBlankProject } from './data/demo'
 import { mergeCalibration } from './lib/calibration'
-import { clampToLane } from './lib/geometry'
+import { boundingBox, clampToLane } from './lib/geometry'
 import { parseProjectJson } from './lib/exporters'
 import type {
   CalibrationConfig,
@@ -19,14 +19,47 @@ import type {
   VsmProject,
 } from './types'
 
-export type AppTab = 'vsm' | 'spaghetti' | 'analytics' | 'benchmarks'
+export type AppTab = 'vsm' | 'spaghetti' | 'analytics' | 'benchmarks' | 'station'
 export type VsmTool = 'select' | 'connect'
-export type SpaghettiTool = 'select' | 'zone' | 'route'
+export type SpaghettiTool = 'select' | 'zone' | 'poly' | 'route'
 
 let idSeq = Date.now() % 100000
 export const nextId = (prefix: string): string => `${prefix}_${(idSeq++).toString(36)}`
 
 const STORAGE_KEY = 'vstream.project.v1'
+const PREFS_KEY = 'vstream.prefs.v1'
+
+/** View preferences — device-local (not part of the project file). */
+export interface ViewPrefs {
+  /** Show the dot grid on the VSM sheet. */
+  vsmGrid: boolean
+  /** Snap node positions to the grid step. */
+  vsmSnap: boolean
+  /** VSM snap step, canvas units. */
+  snapStep: number
+  /** Show the line grid on the floor map. */
+  floorGrid: boolean
+  /** Floor grid step, canvas units. */
+  floorGridStep: number
+}
+
+const DEFAULT_PREFS: ViewPrefs = {
+  vsmGrid: true,
+  vsmSnap: false,
+  snapStep: 20,
+  floorGrid: true,
+  floorGridStep: 50,
+}
+
+function loadPrefs(): ViewPrefs {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY)
+    if (raw) return { ...DEFAULT_PREFS, ...(JSON.parse(raw) as Partial<ViewPrefs>) }
+  } catch {
+    // corrupted prefs — fall back to defaults
+  }
+  return { ...DEFAULT_PREFS }
+}
 
 interface HistoryShape {
   nodes: VsmNode[]
@@ -57,6 +90,11 @@ export interface AppState {
   draftRoute: { x: number; y: number }[]
   selectedZoneId: string | null
   selectedRouteId: string | null
+  /** Station whose deep rate-analysis window is open. */
+  stationDetailId: string | null
+  /** Polygon-zone draft vertices. */
+  draftPoly: { x: number; y: number }[]
+  prefs: ViewPrefs
   // history
   past: HistoryShape[]
   future: HistoryShape[]
@@ -88,6 +126,10 @@ export interface AppState {
   cancelDraftRoute: () => void
   updateRoute: (id: string, patch: Partial<TravelRoute>) => void
   moveRoutePoint: (routeId: string, index: number, x: number, y: number) => void
+  pushDraftPolyPoint: (x: number, y: number) => void
+  finishDraftPoly: () => void
+  cancelDraftPoly: () => void
+  moveZonePoint: (zoneId: string, index: number, x: number, y: number) => void
   deleteFloorSelection: () => void
   setMetersPerUnit: (v: number) => void
   setFloorBackground: (bg: FloorBackground | null) => void
@@ -99,6 +141,11 @@ export interface AppState {
   // calibration
   setCalibration: (cal: CalibrationConfig) => void
   resetCalibration: () => void
+  // station drill-down
+  openStationDetail: (id: string) => void
+  closeStationDetail: () => void
+  // view prefs
+  setPrefs: (p: Partial<ViewPrefs>) => void
   // project lifecycle
   loadProject: (p: VsmProject) => void
   loadDemo: () => void
@@ -132,6 +179,11 @@ function initialProject(): VsmProject {
 
 const init = initialProject()
 
+/** Apply grid snapping when the preference is on. */
+function snapTo(s: { prefs: ViewPrefs }, v: number): number {
+  return s.prefs.vsmSnap ? Math.round(v / s.prefs.snapStep) * s.prefs.snapStep : v
+}
+
 export const useApp = create<AppState>((set, get) => ({
   projectName: init.name,
   nodes: init.nodes,
@@ -151,6 +203,9 @@ export const useApp = create<AppState>((set, get) => ({
   draftRoute: [],
   selectedZoneId: null,
   selectedRouteId: null,
+  stationDetailId: null,
+  draftPoly: [],
+  prefs: loadPrefs(),
   past: [],
   future: [],
 
@@ -163,7 +218,7 @@ export const useApp = create<AppState>((set, get) => ({
     set((s) => {
       const entry = PALETTE_BY_KIND.get(kind)
       const lane = NODE_LANE[kind]
-      const pos = clampToLane(lane, x, y)
+      const pos = clampToLane(lane, snapTo(s, x), snapTo(s, y))
       const node: VsmNode = {
         id: nextId('n'),
         kind,
@@ -177,7 +232,7 @@ export const useApp = create<AppState>((set, get) => ({
   moveNode: (id, x, y) =>
     set((s) => ({
       nodes: s.nodes.map((n) =>
-        n.id === id ? { ...n, ...clampToLane(NODE_LANE[n.kind], x, y) } : n,
+        n.id === id ? { ...n, ...clampToLane(NODE_LANE[n.kind], snapTo(s, x), snapTo(s, y)) } : n,
       ),
     })),
 
@@ -225,7 +280,7 @@ export const useApp = create<AppState>((set, get) => ({
   updateDemand: (patch) => set((s) => withHistory(s, { demand: { ...s.demand, ...patch } })),
 
   // --- spaghetti ---
-  setSpaghettiTool: (spaghettiTool) => set({ spaghettiTool, draftRoute: [] }),
+  setSpaghettiTool: (spaghettiTool) => set({ spaghettiTool, draftRoute: [], draftPoly: [] }),
   setRouteMode: (routeMode) => set({ routeMode }),
   addZone: (z) =>
     set((s) =>
@@ -246,7 +301,15 @@ export const useApp = create<AppState>((set, get) => ({
     set((s) => ({
       spaghetti: {
         ...s.spaghetti,
-        zones: s.spaghetti.zones.map((z) => (z.id === id ? { ...z, x, y } : z)),
+        zones: s.spaghetti.zones.map((z) => {
+          if (z.id !== id) return z
+          const dx = x - z.x
+          const dy = y - z.y
+          return {
+            ...z, x, y,
+            points: z.points?.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+          }
+        }),
       },
     })),
   selectZone: (id) => set({ selectedZoneId: id, selectedRouteId: null }),
@@ -270,6 +333,37 @@ export const useApp = create<AppState>((set, get) => ({
       })
     }),
   cancelDraftRoute: () => set({ draftRoute: [] }),
+  pushDraftPolyPoint: (x, y) => set((s) => ({ draftPoly: [...s.draftPoly, { x, y }] })),
+  finishDraftPoly: () =>
+    set((s) => {
+      if (s.draftPoly.length < 3) return { draftPoly: [] }
+      const box = boundingBox(s.draftPoly)
+      const zone = {
+        id: nextId('z'),
+        name: `Zone ${s.spaghetti.zones.length + 1}`,
+        ...box,
+        color: '#94A3B8',
+        points: s.draftPoly,
+      }
+      return withHistory(s, {
+        spaghetti: { ...s.spaghetti, zones: [...s.spaghetti.zones, zone] },
+        draftPoly: [],
+        selectedZoneId: zone.id,
+        selectedRouteId: null,
+      })
+    }),
+  cancelDraftPoly: () => set({ draftPoly: [] }),
+  moveZonePoint: (zoneId, index, x, y) =>
+    set((s) => ({
+      spaghetti: {
+        ...s.spaghetti,
+        zones: s.spaghetti.zones.map((z) => {
+          if (z.id !== zoneId || !z.points) return z
+          const points = z.points.map((p, i) => (i === index ? { x, y } : p))
+          return { ...z, ...boundingBox(points), points }
+        }),
+      },
+    })),
   updateRoute: (id, patch) =>
     set((s) =>
       withHistory(s, {
@@ -351,6 +445,21 @@ export const useApp = create<AppState>((set, get) => ({
   setCalibration: (cal) => set((s) => withHistory(s, { calibration: mergeCalibration(cal) })),
   resetCalibration: () => set((s) => withHistory(s, { calibration: mergeCalibration() })),
 
+  openStationDetail: (stationDetailId) =>
+    set({ stationDetailId, selectedNodeId: stationDetailId, selectedEdgeId: null, tab: 'station' }),
+  closeStationDetail: () => set({ stationDetailId: null }),
+
+  setPrefs: (p) =>
+    set((s) => {
+      const prefs = { ...s.prefs, ...p }
+      try {
+        localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
+      } catch {
+        // storage full / private mode — non-fatal
+      }
+      return { prefs }
+    }),
+
   // --- project lifecycle ---
   loadProject: (p) =>
     set({
@@ -367,6 +476,7 @@ export const useApp = create<AppState>((set, get) => ({
       selectedRouteId: null,
       connectFrom: null,
       draftRoute: [],
+      draftPoly: [],
       past: [],
       future: [],
     }),

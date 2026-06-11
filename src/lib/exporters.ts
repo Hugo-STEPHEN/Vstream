@@ -46,13 +46,16 @@ function toCsv(rows: (string | number)[][]): string {
 
 export function exportMetricsCsv(name: string, m: SystemMetrics): void {
   const rows: (string | number)[][] = [
-    ['Station', 'Kind', 'CT nominal (s)', 'Availability', 'Scrap rate', 'Setup (s)', 'Batch',
+    ['Station', 'Kind', 'CT nominal (s)', 'Availability', 'Performance', 'Scrap rate', 'Setup (s)', 'Batch',
       'CT effective (s)', 'CT quality (s)', 'Setup penalty (s)', 'CT grand (s)', 'Takt load (%)',
+      'TRS (%)', 'TRG (%)', 'TRE (%)',
       'Operators', 'Over takt', 'SMED alert'],
     ...m.processes.map((p) => [
-      p.label, p.kind, p.ctNominal, p.availability, p.scrap, p.setup, p.batch,
+      p.label, p.kind, p.ctNominal, p.availability, p.performance, p.scrap, p.setup, p.batch,
       round2(p.ctEffective), round2(p.ctQuality), round2(p.setupPenalty), round2(p.ctGrand),
-      round2(p.taktUtilization * 100), p.operators, p.exceedsTakt ? 'YES' : 'no',
+      round2(p.taktUtilization * 100),
+      round2(p.trs * 100), round2(p.trg * 100), round2(p.tre * 100),
+      p.operators, p.exceedsTakt ? 'YES' : 'no',
       p.smedAlert ? 'YES' : 'no',
     ]),
     [],

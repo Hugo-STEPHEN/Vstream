@@ -59,13 +59,18 @@ export function generateKaizenSuggestions(
     }
   }
 
+  const fr = cal.language === 'fr'
   for (const p of base.processes) {
     if (p.setupPenalty > p.ctNominal * 0.25 && p.setup > 0) {
       evaluate(
         `smed-${p.nodeId}`,
         p.nodeId,
-        `SMED workshop at ${p.label}: halve setup to ${Math.round(p.setup / 2)}s`,
-        `Changeover currently amortizes to ${p.setupPenalty.toFixed(1)}s per part.`,
+        fr
+          ? `Chantier SMED sur ${p.label} : diviser le changement par 2 → ${Math.round(p.setup / 2)}s`
+          : `SMED workshop at ${p.label}: halve setup to ${Math.round(p.setup / 2)}s`,
+        fr
+          ? `Le changement s'amortit aujourd'hui à ${p.setupPenalty.toFixed(1)}s par pièce.`
+          : `Changeover currently amortizes to ${p.setupPenalty.toFixed(1)}s per part.`,
         { setup: p.setup / 2 },
       )
     }
@@ -73,8 +78,12 @@ export function generateKaizenSuggestions(
       evaluate(
         `tpm-${p.nodeId}`,
         p.nodeId,
-        `TPM program at ${p.label}: raise availability ${Math.round(p.availability * 100)}% → 90%`,
-        `Downtime stretches each part from ${p.ctNominal.toFixed(1)}s to ${p.ctEffective.toFixed(1)}s.`,
+        fr
+          ? `Programme TPM sur ${p.label} : disponibilité ${Math.round(p.availability * 100)}% → 90%`
+          : `TPM program at ${p.label}: raise availability ${Math.round(p.availability * 100)}% → 90%`,
+        fr
+          ? `Les arrêts allongent chaque pièce de ${p.ctNominal.toFixed(1)}s à ${p.ctEffective.toFixed(1)}s.`
+          : `Downtime stretches each part from ${p.ctNominal.toFixed(1)}s to ${p.ctEffective.toFixed(1)}s.`,
         { availability: 0.9 },
       )
     }
@@ -82,8 +91,12 @@ export function generateKaizenSuggestions(
       evaluate(
         `quality-${p.nodeId}`,
         p.nodeId,
-        `Quality kaizen at ${p.label}: cut scrap ${Math.round(p.scrap * 100)}% → 1%`,
-        `Defects compound capacity loss across every upstream station.`,
+        fr
+          ? `Kaizen qualité sur ${p.label} : rebut ${Math.round(p.scrap * 100)}% → 1%`
+          : `Quality kaizen at ${p.label}: cut scrap ${Math.round(p.scrap * 100)}% → 1%`,
+        fr
+          ? `Les défauts cumulent la perte de capacité sur tous les postes amont.`
+          : `Defects compound capacity loss across every upstream station.`,
         { scrap: 0.01 },
       )
     }
@@ -96,8 +109,12 @@ export function generateKaizenSuggestions(
     evaluate(
       `pull-${inv.nodeId}`,
       inv.nodeId,
-      `Convert ${inv.label} to pull supermarket: cap at ${Math.max(1, Math.round(inv.qty / 2)).toLocaleString()} pcs`,
-      `${inv.days.toFixed(1)} days of WIP is pure lead time with zero value-add.`,
+      fr
+        ? `Convertir ${inv.label} en supermarché tiré : plafonner à ${Math.max(1, Math.round(inv.qty / 2)).toLocaleString()} pcs`
+        : `Convert ${inv.label} to pull supermarket: cap at ${Math.max(1, Math.round(inv.qty / 2)).toLocaleString()} pcs`,
+      fr
+        ? `${inv.days.toFixed(1)} jours d'en-cours = délai pur, zéro valeur ajoutée.`
+        : `${inv.days.toFixed(1)} days of WIP is pure lead time with zero value-add.`,
       { qty: Math.round(inv.qty / 2) },
     )
   }

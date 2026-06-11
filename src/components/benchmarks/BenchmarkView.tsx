@@ -6,8 +6,10 @@ import { useApp } from '../../store'
 import { computeSystemMetrics } from '../../lib/analytics'
 import { computeBenchmarks, overallGrade } from '../../lib/benchmarks'
 import { Section } from '../ui'
+import { useT } from '../../i18n'
 
 export function BenchmarkView() {
+  const { t } = useT()
   const nodes = useApp((s) => s.nodes)
   const demand = useApp((s) => s.demand)
   const calibration = useApp((s) => s.calibration)
@@ -28,7 +30,7 @@ export function BenchmarkView() {
   return (
     <div className="grid h-full grid-cols-1 gap-2 overflow-y-auto p-2 xl:grid-cols-[420px_1fr]">
       <div className="space-y-2">
-        <Section title="Industrial performance grade">
+        <Section title={t('bench.grade')}>
           <div className="flex items-center gap-4 py-2">
             <div
               className="flex h-20 w-20 items-center justify-center rounded-xl border-2 font-display text-5xl font-bold"
@@ -46,7 +48,7 @@ export function BenchmarkView() {
           </div>
         </Section>
 
-        <Section title="Positioning radar">
+        <Section title={t('bench.radar')}>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={radarData} outerRadius="72%">
@@ -62,7 +64,7 @@ export function BenchmarkView() {
         </Section>
       </div>
 
-      <Section title="Benchmark detail — current vs typical vs world class">
+      <Section title={t('bench.detail')}>
         <div className="overflow-x-auto">
           <table className="w-full text-[11.5px]">
             <thead>

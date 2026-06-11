@@ -236,3 +236,32 @@ describe('calibration', () => {
     expect(html).toContain('€1.20/m') // forklift default priced in calibrated currency
   })
 })
+
+describe('TRS / TRG / TRE (NF E 60-182)', () => {
+  it('chains performance into the CT waterfall and the three rates', async () => {
+    const { computeProcessMetrics } = await import('./analytics')
+    const m = computeProcessMetrics(
+      {
+        id: 'x', kind: 'process', label: 'X', x: 0, y: 0,
+        ct: 36, availability: 0.8, performance: 0.9, scrap: 0.1,
+        engagement: 0.8, opening: 0.5, setup: 0, batch: 1,
+      },
+      120,
+    )
+    expect(m.ctEffective).toBeCloseTo(36 / (0.8 * 0.9)) // 50s — speed losses included
+    expect(m.ctQuality).toBeCloseTo(50 / 0.9)
+    expect(m.trs).toBeCloseTo(0.8 * 0.9 * 0.9) // 64.8%
+    expect(m.trg).toBeCloseTo(m.trs * 0.8)
+    expect(m.tre).toBeCloseTo(m.trg * 0.5)
+  })
+
+  it('defaults keep legacy models unchanged (P = engagement = opening = 1)', async () => {
+    const { computeProcessMetrics } = await import('./analytics')
+    const m = computeProcessMetrics(station, 120)
+    expect(m.performance).toBe(1)
+    expect(m.ctEffective).toBeCloseTo(60 / 0.7)
+    expect(m.trs).toBeCloseTo(0.7 * 1 * 0.95)
+    expect(m.trg).toBeCloseTo(m.trs)
+    expect(m.tre).toBeCloseTo(m.trs)
+  })
+})

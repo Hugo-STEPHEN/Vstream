@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { BookOpen, Download, Keyboard, Search, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { DEFINITIONS, DEFINITION_CATEGORIES } from '../data/definitions'
+import { CATEGORY_FR, DEFINITIONS, DEFINITION_CATEGORIES } from '../data/definitions'
 import { exportDefinitionsCsv } from '../lib/exporters'
 import { fuzzyFilter } from '../lib/fuzzy'
+import { useT } from '../i18n'
 
 const SHORTCUTS: [string, string][] = [
   ['V', 'Select & move tool (VSM)'],
@@ -16,10 +17,16 @@ const SHORTCUTS: [string, string][] = [
 ]
 
 export function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { lang, t } = useT()
   const [query, setQuery] = useState('')
 
   const filtered = useMemo(
-    () => fuzzyFilter(query, DEFINITIONS, (d) => `${d.term} ${d.category} ${d.definition}`),
+    () =>
+      fuzzyFilter(
+        query,
+        DEFINITIONS,
+        (d) => `${d.term} ${d.termFr ?? ''} ${d.category} ${d.definition} ${d.definitionFr ?? ''}`,
+      ),
     [query],
   )
 
@@ -39,13 +46,13 @@ export function HelpModal({ open, onClose }: { open: boolean; onClose: () => voi
           >
             <header className="flex items-center gap-2 border-b border-edge px-4 py-3">
               <BookOpen size={16} className="text-flow" />
-              <h2 className="font-display text-sm font-semibold text-white">Need definitions & formulas</h2>
+              <h2 className="font-display text-sm font-semibold text-white">{t('help.title')}</h2>
               <button
                 className="btn-ghost ml-auto flex items-center gap-1.5"
                 onClick={exportDefinitionsCsv}
                 title="Download the full data dictionary as CSV"
               >
-                <Download size={12} /> Data dictionary (.csv)
+                <Download size={12} /> {t('help.dictionary')}
               </button>
               <button className="rounded-md p-1.5 text-slate-400 hover:text-white transition-colors" onClick={onClose} title="Close (Esc)">
                 <X size={16} />
@@ -59,7 +66,7 @@ export function HelpModal({ open, onClose }: { open: boolean; onClose: () => voi
                   autoFocus
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search a term… (takt, PCE, setup penalty)"
+                  placeholder={t('help.search')}
                   className="w-full rounded-md border border-edge bg-ink py-1.5 pl-7 pr-2 text-xs text-slate-200
                     focus:border-flow/70 focus:outline-none transition-colors"
                 />
@@ -72,16 +79,16 @@ export function HelpModal({ open, onClose }: { open: boolean; onClose: () => voi
                 if (items.length === 0) return null
                 return (
                   <section key={cat}>
-                    <h3 className="field-label pb-1.5">{cat}</h3>
+                    <h3 className="field-label pb-1.5">{lang === 'fr' ? CATEGORY_FR[cat] : cat}</h3>
                     <div className="overflow-hidden rounded-lg border border-edge">
                       {items.map((d, i) => (
                         <div key={d.term} className={`grid grid-cols-[170px_1fr] gap-3 px-3 py-2 ${i > 0 ? 'border-t border-edge/60' : ''}`}>
                           <div>
-                            <div className="text-[11.5px] font-medium text-slate-200">{d.term}</div>
+                            <div className="text-[11.5px] font-medium text-slate-200">{lang === 'fr' ? d.termFr ?? d.term : d.term}</div>
                             <div className="font-mono text-[10px] text-flow/80">{d.formula}</div>
                             {d.unit !== '—' && <div className="font-mono text-[9.5px] text-slate-500">{d.unit}</div>}
                           </div>
-                          <p className="text-[11px] leading-relaxed text-slate-400">{d.definition}</p>
+                          <p className="text-[11px] leading-relaxed text-slate-400">{lang === 'fr' ? d.definitionFr ?? d.definition : d.definition}</p>
                         </div>
                       ))}
                     </div>
@@ -95,7 +102,7 @@ export function HelpModal({ open, onClose }: { open: boolean; onClose: () => voi
               {!query && (
                 <section>
                   <h3 className="field-label flex items-center gap-1.5 pb-1.5">
-                    <Keyboard size={12} /> Keyboard shortcuts
+                    <Keyboard size={12} /> {t('help.shortcuts')}
                   </h3>
                   <div className="overflow-hidden rounded-lg border border-edge">
                     {SHORTCUTS.map(([key, what], i) => (

@@ -50,14 +50,24 @@ export function computeProcessMetrics(
 ): ProcessMetrics {
   const ctNominal = Math.max(0, node.ct ?? 0)
   const availability = clamp(node.availability ?? 1, 0.1, 1)
+  const performance = clamp(node.performance ?? 1, 0.1, 1)
+  const engagement = clamp(node.engagement ?? 1, 0, 1)
+  const opening = clamp(node.opening ?? 1, 0, 1)
   const scrap = clamp(node.scrap ?? 0, 0, 0.95)
   const setup = Math.max(0, node.setup ?? 0)
   const batch = Math.max(1, node.batch ?? 1)
 
-  const ctEffective = effectiveCycleTime(ctNominal, availability)
+  // Speed losses (allure) compound with availability in the effective CT.
+  const ctEffective = effectiveCycleTime(ctNominal, availability * performance)
   const ctQuality = qualityCycleTime(ctEffective, scrap)
   const setupPenalty = setupAmortization(setup, batch)
   const ctGrand = ctQuality + setupPenalty
+
+  // NF E 60-182 rates: TRS (OEE) over required time, TRG over opening, TRE over total.
+  const qualityRate = 1 - scrap
+  const trs = availability * performance * qualityRate
+  const trg = trs * engagement
+  const tre = trg * opening
 
   const taktUtilization = taktSeconds > 0 ? ctGrand / taktSeconds : 0
   return {
@@ -70,6 +80,13 @@ export function computeProcessMetrics(
     setupPenalty,
     ctGrand,
     availability,
+    performance,
+    engagement,
+    opening,
+    qualityRate,
+    trs,
+    trg,
+    tre,
     scrap,
     setup,
     batch,
@@ -164,7 +181,7 @@ export function computeSystemMetrics(
     return s + (starts - demandPerDay)
   }, 0)
 
-  const alerts = buildAlerts(processes, inventories, taktSeconds, pce, cal.alerts)
+  const alerts = buildAlerts(processes, inventories, taktSeconds, pce, cal.alerts, cal.language)
 
   return {
     taktSeconds,
@@ -198,7 +215,9 @@ function buildAlerts(
   taktSeconds: number,
   pce: number,
   t: AlertThresholds,
+  lang: CalibrationConfig['language'] = 'en',
 ): Alert[] {
+  const fr = lang === 'fr'
   const alerts: Alert[] = []
   for (const p of processes) {
     if (p.exceedsTakt) {
@@ -206,8 +225,10 @@ function buildAlerts(
         id: `takt-${p.nodeId}`,
         nodeId: p.nodeId,
         level: 'critical',
-        title: `${p.label} exceeds takt`,
-        detail: `Grand effective CT ${fmtSeconds(p.ctGrand)} vs takt ${fmtSeconds(taktSeconds)} (${Math.round(p.taktUtilization * 100)}% loaded). Demand cannot be met without overtime or capacity.`,
+        title: fr ? `${p.label} dépasse le takt` : `${p.label} exceeds takt`,
+        detail: fr
+          ? `TC effectif global ${fmtSeconds(p.ctGrand)} vs takt ${fmtSeconds(taktSeconds)} (${Math.round(p.taktUtilization * 100)}% de charge). La demande ne peut être tenue sans heures sup ou capacité.`
+          : `Grand effective CT ${fmtSeconds(p.ctGrand)} vs takt ${fmtSeconds(taktSeconds)} (${Math.round(p.taktUtilization * 100)}% loaded). Demand cannot be met without overtime or capacity.`,
       })
     }
     if (p.smedAlert) {
@@ -215,8 +236,10 @@ function buildAlerts(
         id: `smed-${p.nodeId}`,
         nodeId: p.nodeId,
         level: 'warning',
-        title: `High setup penalty at ${p.label}`,
-        detail: `Amortized changeover adds ${fmtSeconds(p.setupPenalty)}/part — over ${Math.round(t.smedFactor * 100)}% of its ${fmtSeconds(p.ctNominal)} nominal CT. Run a SMED workshop or raise batch size (at the cost of inventory).`,
+        title: fr ? `Forte pénalité de changement sur ${p.label}` : `High setup penalty at ${p.label}`,
+        detail: fr
+          ? `Le changement amorti ajoute ${fmtSeconds(p.setupPenalty)}/pièce — plus de ${Math.round(t.smedFactor * 100)}% du TC nominal de ${fmtSeconds(p.ctNominal)}. Lancez un chantier SMED ou revoyez les lots.`
+          : `Amortized changeover adds ${fmtSeconds(p.setupPenalty)}/part — over ${Math.round(t.smedFactor * 100)}% of its ${fmtSeconds(p.ctNominal)} nominal CT. Run a SMED workshop or raise batch size (at the cost of inventory).`,
       })
     }
     if (p.scrap >= t.scrapWarn) {
@@ -224,8 +247,10 @@ function buildAlerts(
         id: `scrap-${p.nodeId}`,
         nodeId: p.nodeId,
         level: 'warning',
-        title: `Scrap ${Math.round(p.scrap * 100)}% at ${p.label}`,
-        detail: `Quality losses inflate effective CT to ${fmtSeconds(p.ctQuality)}. Root-cause the top defect mode.`,
+        title: fr ? `Rebut ${Math.round(p.scrap * 100)}% sur ${p.label}` : `Scrap ${Math.round(p.scrap * 100)}% at ${p.label}`,
+        detail: fr
+          ? `Les pertes qualité gonflent le TC effectif à ${fmtSeconds(p.ctQuality)}. Traitez la cause racine du premier mode de défaut.`
+          : `Quality losses inflate effective CT to ${fmtSeconds(p.ctQuality)}. Root-cause the top defect mode.`,
       })
     }
     if (p.availability < t.availabilityWarn) {
@@ -233,8 +258,10 @@ function buildAlerts(
         id: `oee-${p.nodeId}`,
         nodeId: p.nodeId,
         level: 'warning',
-        title: `Availability ${Math.round(p.availability * 100)}% at ${p.label}`,
-        detail: `Downtime stretches each part to ${fmtSeconds(p.ctEffective)}. Investigate breakdowns, starvation and minor stops.`,
+        title: fr ? `Disponibilité ${Math.round(p.availability * 100)}% sur ${p.label}` : `Availability ${Math.round(p.availability * 100)}% at ${p.label}`,
+        detail: fr
+          ? `Les arrêts allongent chaque pièce à ${fmtSeconds(p.ctEffective)}. Analysez pannes, famine matière et micro-arrêts.`
+          : `Downtime stretches each part to ${fmtSeconds(p.ctEffective)}. Investigate breakdowns, starvation and minor stops.`,
       })
     }
   }
@@ -244,8 +271,12 @@ function buildAlerts(
         id: `inv-${inv.nodeId}`,
         nodeId: inv.nodeId,
         level: 'info',
-        title: `${inv.label}: ${inv.days.toFixed(1)} days of inventory`,
-        detail: `${inv.qty.toLocaleString()} parts queued — a leading driver of the lead time. Consider a supermarket with pull sizing.`,
+        title: fr
+          ? `${inv.label} : ${inv.days.toFixed(1)} jours de stock`
+          : `${inv.label}: ${inv.days.toFixed(1)} days of inventory`,
+        detail: fr
+          ? `${inv.qty.toLocaleString()} pièces en attente — un moteur majeur du délai d'écoulement. Envisagez un supermarché dimensionné en tiré.`
+          : `${inv.qty.toLocaleString()} parts queued — a leading driver of the lead time. Consider a supermarket with pull sizing.`,
       })
     }
   }
@@ -253,8 +284,10 @@ function buildAlerts(
     alerts.push({
       id: 'pce-low',
       level: 'info',
-      title: `PCE ${pce.toFixed(1)}% — flow opportunity`,
-      detail: `Less than ${t.pceLowPct}% of the lead time adds value. Attack the largest NVA valleys first.`,
+      title: fr ? `PCE ${pce.toFixed(1)}% — gisement de flux` : `PCE ${pce.toFixed(1)}% — flow opportunity`,
+      detail: fr
+        ? `Moins de ${t.pceLowPct}% du délai ajoute de la valeur. Attaquez d'abord les plus grandes vallées NVA.`
+        : `Less than ${t.pceLowPct}% of the lead time adds value. Attack the largest NVA valleys first.`,
     })
   }
   return alerts

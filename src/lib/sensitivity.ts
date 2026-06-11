@@ -3,7 +3,7 @@ import { DEFAULT_CALIBRATION } from './calibration'
 import type { CalibrationConfig, DemandConfig, VsmNode } from '../types'
 
 /** Station parameters that can be swept in the sensitivity explorer. */
-export type SweepParam = 'ct' | 'availability' | 'scrap' | 'setup' | 'batch'
+export type SweepParam = 'ct' | 'availability' | 'performance' | 'scrap' | 'setup' | 'batch'
 
 export interface SweepParamDef {
   param: SweepParam
@@ -34,6 +34,15 @@ export const SWEEP_PARAMS: SweepParamDef[] = [
     range: () => ({ min: 0.1, max: 1 }),
     read: (n) => n.availability ?? 1,
     write: (availability) => ({ availability }),
+    displayFactor: 100,
+  },
+  {
+    param: 'performance',
+    label: 'Performance rate',
+    unit: '%',
+    range: () => ({ min: 0.1, max: 1 }),
+    read: (n) => n.performance ?? 1,
+    write: (performance) => ({ performance }),
     displayFactor: 100,
   },
   {

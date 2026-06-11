@@ -4,6 +4,7 @@ import { useApp } from '../../store'
 import { computeSystemMetrics, fmtSeconds } from '../../lib/analytics'
 import { computeBenchmarks, overallGrade } from '../../lib/benchmarks'
 import { Badge, Section } from '../ui'
+import { useT } from '../../i18n'
 import type { CalibrationConfig, DemandConfig, SystemMetrics, VsmNode } from '../../types'
 
 interface ScenarioRow {
@@ -32,6 +33,7 @@ function row(
  * jump back to any of them.
  */
 export function ScenarioBar() {
+  const { t } = useT()
   const nodes = useApp((s) => s.nodes)
   const demand = useApp((s) => s.demand)
   const scenarios = useApp((s) => s.scenarios)
@@ -40,10 +42,10 @@ export function ScenarioBar() {
 
   const rows = useMemo<ScenarioRow[]>(
     () => [
-      row(null, 'Current model', nodes, demand, calibration),
+      row(null, t('ana.currentModel'), nodes, demand, calibration),
       ...scenarios.map((sc) => row(sc.id, sc.name, sc.nodes, sc.demand, calibration, sc.savedAt)),
     ],
-    [nodes, demand, scenarios, calibration],
+    [nodes, demand, scenarios, calibration, t],
   )
   const base = rows[0].metrics
 
@@ -54,7 +56,7 @@ export function ScenarioBar() {
 
   return (
     <Section
-      title="Scenario workbench — what-if comparison"
+      title={t('ana.scenarios')}
       right={
         <div className="flex items-center gap-1.5">
           <input
@@ -67,7 +69,7 @@ export function ScenarioBar() {
           />
           <button className="btn-ghost flex items-center gap-1 !text-flow hover:!border-flow/50" onClick={save}
             title="Freeze the current stations, connections and demand as a named scenario">
-            <Camera size={12} /> Save current
+            <Camera size={12} /> {t('ana.saveCurrent')}
           </button>
         </div>
       }
@@ -121,7 +123,7 @@ export function ScenarioBar() {
                         <span className="flex justify-end gap-1">
                           <button className="btn-ghost flex items-center gap-1 !py-1" title="Apply this scenario to the canvas (undoable)"
                             onClick={() => useApp.getState().applyScenario(r.id as string)}>
-                            <CornerUpLeft size={11} /> Apply
+                            <CornerUpLeft size={11} /> {t('ana.apply')}
                           </button>
                           <button className="btn-ghost !py-1 hover:!text-crit" title="Delete scenario"
                             onClick={() => useApp.getState().deleteScenario(r.id as string)}>

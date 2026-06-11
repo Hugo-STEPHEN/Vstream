@@ -11,6 +11,7 @@ import type {
  * complete config, so the engines never see a missing knob.
  */
 export const DEFAULT_CALIBRATION: CalibrationConfig = {
+  language: 'en',
   currency: '$',
   stepMeters: 0.75,
   alerts: {
@@ -43,6 +44,7 @@ export function mergeCalibration(partial?: DeepPartial<CalibrationConfig>): Cali
   const modes: TransportMode[] = ['walk', 'forklift', 'agv']
   const keys: BenchmarkKey[] = ['pce', 'availability', 'fpy', 'inventory', 'setup', 'capacity']
   return {
+    language: partial?.language === 'fr' ? 'fr' : d.language,
     currency: partial?.currency ?? d.currency,
     stepMeters: partial?.stepMeters ?? d.stepMeters,
     alerts: { ...d.alerts, ...partial?.alerts },

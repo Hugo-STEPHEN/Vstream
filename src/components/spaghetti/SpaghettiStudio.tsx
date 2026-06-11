@@ -1,10 +1,15 @@
-import { useMemo, useRef, useState } from 'react'
-import { Footprints, Forklift, ImagePlus, MousePointer2, Route as RouteIcon, Square, Trash2, Bot, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Footprints, Forklift, Grid3X3, ImagePlus, MousePointer2, Pentagon, Route as RouteIcon,
+  Square, Trash2, Bot, X,
+} from 'lucide-react'
 import { useApp } from '../../store'
 import { isProcessKind } from '../../lib/analytics'
 import { transportProfiles } from '../../lib/calibration'
+import { polygonArea } from '../../lib/geometry'
 import { computeSpaghettiSummary, computeTransportAudit, fmtMoney } from '../../lib/spaghetti'
 import { NumberField, Section, Stat, TextField } from '../ui'
+import { useT } from '../../i18n'
 import type { TransportMode } from '../../types'
 
 export const FLOOR = { width: 1400, height: 720 } as const
@@ -17,13 +22,16 @@ const MODE_ICON: Record<TransportMode, typeof Footprints> = {
 }
 
 export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }) {
+  const { t } = useT()
   const spaghetti = useApp((s) => s.spaghetti)
   const demand = useApp((s) => s.demand)
   const tool = useApp((s) => s.spaghettiTool)
   const routeMode = useApp((s) => s.routeMode)
   const draft = useApp((s) => s.draftRoute)
+  const draftPoly = useApp((s) => s.draftPoly)
   const selectedZoneId = useApp((s) => s.selectedZoneId)
   const selectedRouteId = useApp((s) => s.selectedRouteId)
+  const prefs = useApp((s) => s.prefs)
 
   const calibration = useApp((s) => s.calibration)
   const profiles = useMemo(() => transportProfiles(calibration), [calibration])
@@ -33,19 +41,45 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
   )
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const [view, setView] = useState({ x: 0, y: 0, k: 1 })
+  const [gridOpen, setGridOpen] = useState(false)
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
   const [zoneDraft, setZoneDraft] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
   const dragZone = useRef<{ id: string; dx: number; dy: number; moved: boolean } | null>(null)
   const dragPoint = useRef<{ routeId: string; index: number; moved: boolean } | null>(null)
+  const dragZonePt = useRef<{ zoneId: string; index: number; moved: boolean } | null>(null)
+  const dragPan = useRef<{ startX: number; startY: number; viewX: number; viewY: number } | null>(null)
+
+  const fitView = useCallback(() => {
+    const el = containerRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const k = Math.min(r.width / FLOOR.width, r.height / FLOOR.height) * 0.98
+    setView({ k, x: (r.width - FLOOR.width * k) / 2, y: (r.height - FLOOR.height * k) / 2 })
+  }, [])
+
+  useEffect(() => {
+    fitView()
+  }, [fitView])
 
   const toWorld = (e: React.PointerEvent | React.MouseEvent): { x: number; y: number } => {
     const svg = svgRef.current
     if (!svg) return { x: 0, y: 0 }
     const r = svg.getBoundingClientRect()
-    return {
-      x: ((e.clientX - r.left) / r.width) * FLOOR.width,
-      y: ((e.clientY - r.top) / r.height) * FLOOR.height,
-    }
+    return { x: (e.clientX - r.left - view.x) / view.k, y: (e.clientY - r.top - view.y) / view.k }
+  }
+
+  const onWheel = (e: React.WheelEvent) => {
+    const rect = svgRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1
+    setView((v) => {
+      const k = Math.min(4, Math.max(0.2, v.k * factor))
+      const px = e.clientX - rect.left
+      const py = e.clientY - rect.top
+      // Keep the world point under the cursor fixed while zooming.
+      return { k, x: px - ((px - v.x) / v.k) * k, y: py - ((py - v.y) / v.k) * k }
+    })
   }
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -55,6 +89,10 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
       useApp.getState().pushDraftPoint(w.x, w.y)
       return
     }
+    if (tool === 'poly') {
+      useApp.getState().pushDraftPolyPoint(w.x, w.y)
+      return
+    }
     if (tool === 'zone') {
       setZoneDraft({ x0: w.x, y0: w.y, x1: w.x, y1: w.y })
       ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
@@ -62,12 +100,19 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
     }
     useApp.getState().selectZone(null)
     useApp.getState().selectRoute(null)
+    dragPan.current = { startX: e.clientX, startY: e.clientY, viewX: view.x, viewY: view.y }
+    ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
   }
 
   const onPointerMove = (e: React.PointerEvent) => {
     const w = toWorld(e)
     setHover(w)
     if (zoneDraft) setZoneDraft({ ...zoneDraft, x1: w.x, y1: w.y })
+    const pan = dragPan.current
+    if (pan) {
+      setView((v) => ({ ...v, x: pan.viewX + e.clientX - pan.startX, y: pan.viewY + e.clientY - pan.startY }))
+      return
+    }
     const dz = dragZone.current
     if (dz) {
       if (!dz.moved) {
@@ -84,11 +129,21 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
       }
       useApp.getState().moveRoutePoint(dp.routeId, dp.index, w.x, w.y)
     }
+    const dzp = dragZonePt.current
+    if (dzp) {
+      if (!dzp.moved) {
+        dzp.moved = true
+        useApp.getState().updateZone(dzp.zoneId, {}) // one undo entry per gesture
+      }
+      useApp.getState().moveZonePoint(dzp.zoneId, dzp.index, w.x, w.y)
+    }
   }
 
   const onPointerUp = () => {
     dragZone.current = null
     dragPoint.current = null
+    dragZonePt.current = null
+    dragPan.current = null
     if (zoneDraft) {
       const x = Math.min(zoneDraft.x0, zoneDraft.x1)
       const y = Math.min(zoneDraft.y0, zoneDraft.y1)
@@ -107,6 +162,7 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
 
   const onDoubleClick = () => {
     if (tool === 'route') useApp.getState().finishDraftRoute()
+    if (tool === 'poly') useApp.getState().finishDraftPoly()
   }
 
   const selectedRoute = spaghetti.routes.find((r) => r.id === selectedRouteId)
@@ -117,14 +173,17 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
       {/* Left: tools + canvas */}
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-1.5 border-b border-edge bg-panel px-2 py-1.5">
-          <ToolButton active={tool === 'select'} onClick={() => useApp.getState().setSpaghettiTool('select')} title="Select & move zones">
-            <MousePointer2 size={13} /> Select
+          <ToolButton active={tool === 'select'} onClick={() => useApp.getState().setSpaghettiTool('select')} title={t('floor.selectHint')}>
+            <MousePointer2 size={13} /> {t('floor.select')}
           </ToolButton>
-          <ToolButton active={tool === 'zone'} onClick={() => useApp.getState().setSpaghettiTool('zone')} title="Drag to draw a floor zone (machine, storage, aisle)">
-            <Square size={13} /> Zone
+          <ToolButton active={tool === 'zone'} onClick={() => useApp.getState().setSpaghettiTool('zone')} title={t('floor.zoneHint')}>
+            <Square size={13} /> {t('floor.zone')}
           </ToolButton>
-          <ToolButton active={tool === 'route'} onClick={() => useApp.getState().setSpaghettiTool('route')} title="Click waypoints, double-click to finish">
-            <RouteIcon size={13} /> Route
+          <ToolButton active={tool === 'poly'} onClick={() => useApp.getState().setSpaghettiTool('poly')} title={t('floor.polyHint')}>
+            <Pentagon size={13} /> {t('floor.poly')}
+          </ToolButton>
+          <ToolButton active={tool === 'route'} onClick={() => useApp.getState().setSpaghettiTool('route')} title={t('floor.routeHint')}>
+            <RouteIcon size={13} /> {t('floor.route')}
           </ToolButton>
           <div className="mx-2 h-5 w-px bg-edge" />
           {(Object.keys(profiles) as TransportMode[]).map((m) => {
@@ -143,24 +202,30 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
               <button className="btn-ghost" onClick={() => useApp.getState().cancelDraftRoute()}>cancel</button>
             </span>
           )}
+          {tool === 'poly' && draftPoly.length > 0 && (
+            <span className="ml-auto flex items-center gap-2 text-[11px] font-mono text-flow">
+              {draftPoly.length} vertices — double-click / Enter to close
+              <button className="btn-ghost" onClick={() => useApp.getState().cancelDraftPoly()}>cancel</button>
+            </span>
+          )}
         </div>
 
         <div ref={containerRef} className="relative min-h-0 flex-1 bg-ink">
           <svg
             ref={svgRef}
-            viewBox={`0 0 ${FLOOR.width} ${FLOOR.height}`}
             className="h-full w-full touch-none select-none"
-            preserveAspectRatio="xMidYMid meet"
+            onWheel={onWheel}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onDoubleClick={onDoubleClick}
           >
             <defs>
-              <pattern id="floorgrid" width="50" height="50" patternUnits="userSpaceOnUse">
-                <path d="M 50 0 H 0 V 50" fill="none" stroke="#1E293B" strokeWidth="0.6" />
+              <pattern id="floorgrid" width={prefs.floorGridStep} height={prefs.floorGridStep} patternUnits="userSpaceOnUse">
+                <path d={`M ${prefs.floorGridStep} 0 H 0 V ${prefs.floorGridStep}`} fill="none" stroke="#1E293B" strokeWidth="0.6" />
               </pattern>
             </defs>
+            <g data-world transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
             {spaghetti.background && (
               <image
                 href={spaghetti.background.dataUrl}
@@ -170,10 +235,12 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
                 pointerEvents="none"
               />
             )}
-            <rect width={FLOOR.width} height={FLOOR.height} fill="url(#floorgrid)" pointerEvents="none" />
+            {prefs.floorGrid && (
+              <rect width={FLOOR.width} height={FLOOR.height} fill="url(#floorgrid)" pointerEvents="none" />
+            )}
             <rect x={1} y={1} width={FLOOR.width - 2} height={FLOOR.height - 2} fill="none" stroke="#334155" strokeWidth={2} />
             <text x={14} y={FLOOR.height - 14} fill="#475569" fontFamily={MONO} fontSize={11}>
-              scale: 1 unit = {spaghetti.metersPerUnit} m · 50-unit grid = {(50 * spaghetti.metersPerUnit).toFixed(1)} m
+              scale: 1 unit = {spaghetti.metersPerUnit} m · {prefs.floorGridStep}-unit grid = {(prefs.floorGridStep * spaghetti.metersPerUnit).toFixed(1)} m
             </text>
 
             {spaghetti.zones.map((z) => (
@@ -189,17 +256,42 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
                   ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
                 }}
               >
-                <rect x={z.x} y={z.y} width={z.w} height={z.h} rx={4}
-                  fill={z.color} fillOpacity={0.07}
-                  stroke={selectedZoneId === z.id ? '#22D3EE' : z.color} strokeOpacity={selectedZoneId === z.id ? 1 : 0.5}
-                  strokeWidth={selectedZoneId === z.id ? 2 : 1.2} />
+                {z.points ? (
+                  <polygon points={z.points.map((p) => `${p.x},${p.y}`).join(' ')}
+                    fill={z.color} fillOpacity={0.07}
+                    stroke={selectedZoneId === z.id ? '#22D3EE' : z.color} strokeOpacity={selectedZoneId === z.id ? 1 : 0.5}
+                    strokeWidth={selectedZoneId === z.id ? 2 : 1.2} strokeLinejoin="round" />
+                ) : (
+                  <rect x={z.x} y={z.y} width={z.w} height={z.h} rx={4}
+                    fill={z.color} fillOpacity={0.07}
+                    stroke={selectedZoneId === z.id ? '#22D3EE' : z.color} strokeOpacity={selectedZoneId === z.id ? 1 : 0.5}
+                    strokeWidth={selectedZoneId === z.id ? 2 : 1.2} />
+                )}
                 <text x={z.x + 10} y={z.y + 20} fill={z.color} fontFamily={'Space Grotesk, sans-serif'} fontSize={13} opacity={0.85}>
                   {z.name}
                 </text>
                 <text x={z.x + 10} y={z.y + 36} fill="#64748B" fontFamily={MONO} fontSize={10}>
-                  {(z.w * spaghetti.metersPerUnit).toFixed(0)}×{(z.h * spaghetti.metersPerUnit).toFixed(0)} m
+                  {z.points
+                    ? `${(polygonArea(z.points) * spaghetti.metersPerUnit * spaghetti.metersPerUnit).toFixed(0)} m²`
+                    : `${(z.w * spaghetti.metersPerUnit).toFixed(0)}×${(z.h * spaghetti.metersPerUnit).toFixed(0)} m`}
                 </text>
               </g>
+            ))}
+
+            {/* Draggable vertices of the selected polygon zone */}
+            {tool === 'select' && selectedZone?.points && selectedZone.points.map((pt, i) => (
+              <circle
+                key={`${selectedZone.id}-v-${i}`}
+                cx={pt.x} cy={pt.y} r={7}
+                fill="#0B0F19" stroke="#22D3EE" strokeWidth={2}
+                className="cursor-move"
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return
+                  e.stopPropagation()
+                  dragZonePt.current = { zoneId: selectedZone.id, index: i, moved: false }
+                  ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+                }}
+              />
             ))}
 
             {spaghetti.routes.map((r) => {
@@ -252,23 +344,56 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
               </g>
             )}
 
+            {draftPoly.length > 0 && (
+              <g pointerEvents="none">
+                <polygon
+                  points={[...draftPoly, ...(hover ? [hover] : [])].map((pt) => `${pt.x},${pt.y}`).join(' ')}
+                  fill="#22D3EE" fillOpacity={0.05} stroke="#22D3EE" strokeWidth={1.5} strokeDasharray="6 4" />
+                {draftPoly.map((pt, i) => (
+                  <circle key={i} cx={pt.x} cy={pt.y} r={3.5} fill="#22D3EE" />
+                ))}
+              </g>
+            )}
+
             {zoneDraft && (
               <rect
                 x={Math.min(zoneDraft.x0, zoneDraft.x1)} y={Math.min(zoneDraft.y0, zoneDraft.y1)}
                 width={Math.abs(zoneDraft.x1 - zoneDraft.x0)} height={Math.abs(zoneDraft.y1 - zoneDraft.y0)}
                 fill="#22D3EE" fillOpacity={0.06} stroke="#22D3EE" strokeDasharray="6 4" pointerEvents="none" />
             )}
+            </g>
           </svg>
+
+          {/* View controls */}
+          <div className="absolute bottom-3 right-3 flex flex-col gap-1">
+            <button className="btn-ghost !px-2 font-mono" onClick={() => setView((v) => ({ ...v, k: Math.min(4, v.k * 1.2) }))}>+</button>
+            <button className="btn-ghost !px-2 font-mono" onClick={() => setView((v) => ({ ...v, k: Math.max(0.2, v.k / 1.2) }))}>−</button>
+            <button className="btn-ghost !px-2 font-mono" onClick={fitView}>⊡</button>
+            <button className={`btn-ghost !px-2 ${gridOpen ? '!text-flow' : ''}`} onClick={() => setGridOpen((o) => !o)} title="Grid settings">
+              <Grid3X3 size={13} />
+            </button>
+          </div>
+          {gridOpen && (
+            <div className="panel absolute bottom-3 right-12 w-44 space-y-2 p-2.5">
+              <label className="flex items-center gap-2 text-xs text-slate-300">
+                <input type="checkbox" className="accent-cyan-400" checked={prefs.floorGrid}
+                  onChange={(e) => useApp.getState().setPrefs({ floorGrid: e.target.checked })} />
+                {t('canvas.gridShow')}
+              </label>
+              <NumberField label={t('canvas.gridStep')} unit="units" value={prefs.floorGridStep} min={10} max={200} step={10}
+                onChange={(floorGridStep) => useApp.getState().setPrefs({ floorGridStep })} />
+            </div>
+          )}
         </div>
 
         {/* Bottom: travel cost ledger */}
         <div className="flex shrink-0 items-stretch gap-2 border-t border-edge bg-panel p-2 overflow-x-auto">
-          <Stat label="Travel / shift" value={`${Math.round(summary.totalMetersPerShift).toLocaleString()} m`} tone="flow" />
-          <Stat label="Time / shift" value={`${summary.totalMinutesPerShift.toFixed(0)} min`} />
-          <Stat label="Cost / shift" value={fmtMoney(summary.totalCostPerShift, calibration.currency)} tone="warn" />
-          <Stat label="Cost / year" value={fmtMoney(summary.totalCostPerYear, calibration.currency)} tone="crit"
+          <Stat label={t('floor.travelShift')} value={`${Math.round(summary.totalMetersPerShift).toLocaleString()} m`} tone="flow" />
+          <Stat label={t('floor.timeShift')} value={`${summary.totalMinutesPerShift.toFixed(0)} min`} />
+          <Stat label={t('floor.costShift')} value={fmtMoney(summary.totalCostPerShift, calibration.currency)} tone="warn" />
+          <Stat label={t('floor.costYear')} value={fmtMoney(summary.totalCostPerYear, calibration.currency)} tone="crit"
             sub={`${demand.shiftsPerDay} shifts × ${demand.daysPerYear} days`} />
-          <Stat label="Best-mode ROI" value={fmtMoney(summary.bestModeSavingPerYear, calibration.currency)} tone="good" sub="potential saving / year" />
+          <Stat label={t('floor.roi')} value={fmtMoney(summary.bestModeSavingPerYear, calibration.currency)} tone="good" sub={t('floor.roiSub')} />
         </div>
       </div>
 
@@ -276,16 +401,16 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
       <aside className="flex w-[300px] shrink-0 flex-col gap-2 overflow-y-auto border-l border-edge bg-ink p-2">
         {selectedRoute ? (
           <Section
-            title="Route"
+            title={t('floor.routeSection')}
             right={
               <button className="text-slate-500 hover:text-crit" title="Delete" onClick={() => useApp.getState().deleteFloorSelection()}>
                 <Trash2 size={14} />
               </button>
             }
           >
-            <TextField label="Name" value={selectedRoute.name} onChange={(name) => useApp.getState().updateRoute(selectedRoute.id, { name })} />
+            <TextField label={t('floor.name')} value={selectedRoute.name} onChange={(name) => useApp.getState().updateRoute(selectedRoute.id, { name })} />
             <div className="space-y-1">
-              <span className="field-label">Transport mode</span>
+              <span className="field-label">{t('floor.mode')}</span>
               {(Object.keys(profiles) as TransportMode[]).map((m) => {
                 const p = profiles[m]
                 return (
@@ -300,32 +425,44 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
                 )
               })}
             </div>
-            <NumberField label="Round trips" unit="/shift" value={selectedRoute.tripsPerShift} min={0} max={200} step={1} slider
+            <NumberField label={t('floor.roundTrips')} unit="/shift" value={selectedRoute.tripsPerShift} min={0} max={200} step={1} slider
               onChange={(tripsPerShift) => useApp.getState().updateRoute(selectedRoute.id, { tripsPerShift })} />
             <RouteLink routeId={selectedRoute.id} linkedNodeId={selectedRoute.linkedNodeId} />
             <RouteReadout routeId={selectedRoute.id} />
             <p className="text-[10px] leading-relaxed text-slate-500">
-              Drag the cyan handles on the canvas to reshape the route.
+              {t('floor.dragHandles')}
             </p>
           </Section>
         ) : selectedZone ? (
           <Section
-            title="Floor zone"
+            title={t('floor.zoneSection')}
             right={
               <button className="text-slate-500 hover:text-crit" title="Delete" onClick={() => useApp.getState().deleteFloorSelection()}>
                 <Trash2 size={14} />
               </button>
             }
           >
-            <TextField label="Name" value={selectedZone.name} onChange={(name) => useApp.getState().updateZone(selectedZone.id, { name })} />
-            <div className="grid grid-cols-2 gap-2">
-              <NumberField label="Width" unit="units" value={Math.round(selectedZone.w)} min={20} step={10}
-                onChange={(w) => useApp.getState().updateZone(selectedZone.id, { w })} />
-              <NumberField label="Height" unit="units" value={Math.round(selectedZone.h)} min={20} step={10}
-                onChange={(h) => useApp.getState().updateZone(selectedZone.id, { h })} />
-            </div>
+            <TextField label={t('floor.name')} value={selectedZone.name} onChange={(name) => useApp.getState().updateZone(selectedZone.id, { name })} />
+            {selectedZone.points ? (
+              <div className="font-mono text-xs text-slate-400">
+                Polygon · {selectedZone.points.length} {t('floor.vertices')} ·{' '}
+                <span className="text-flow">
+                  {(polygonArea(selectedZone.points) * spaghetti.metersPerUnit * spaghetti.metersPerUnit).toFixed(0)} m²
+                </span>
+                <p className="pt-1 font-ui text-[10px] leading-relaxed text-slate-500">
+                  {t('floor.dragVertices')}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <NumberField label={t('floor.width')} unit="units" value={Math.round(selectedZone.w)} min={20} step={10}
+                  onChange={(w) => useApp.getState().updateZone(selectedZone.id, { w })} />
+                <NumberField label={t('floor.height')} unit="units" value={Math.round(selectedZone.h)} min={20} step={10}
+                  onChange={(h) => useApp.getState().updateZone(selectedZone.id, { h })} />
+              </div>
+            )}
             <div className="space-y-1">
-              <span className="field-label">Color</span>
+              <span className="field-label">{t('floor.color')}</span>
               <div className="flex gap-1.5">
                 {['#94A3B8', '#22D3EE', '#34D399', '#FBBF24', '#F87171', '#818CF8'].map((c) => (
                   <button key={c} className={`h-6 w-6 rounded border-2 transition-transform hover:scale-110 ${selectedZone.color === c ? 'border-white' : 'border-transparent'}`}
@@ -337,8 +474,8 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
           </Section>
         ) : (
           <>
-            <Section title="Plant scale">
-              <NumberField label="Meters per canvas unit" unit="m" value={spaghetti.metersPerUnit} min={0.01} max={2} step={0.01}
+            <Section title={t('floor.plantScale')}>
+              <NumberField label={t('floor.metersPerUnit')} unit="m" value={spaghetti.metersPerUnit} min={0.01} max={2} step={0.01}
                 onChange={(v) => useApp.getState().setMetersPerUnit(v)} />
               <p className="text-[11px] leading-relaxed text-slate-500">
                 Draw the plant footprint with <b>Zone</b>, then trace material travel with <b>Route</b> —
@@ -350,9 +487,9 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
           </>
         )}
 
-        <Section title={`Routes (${summary.routes.length})`}>
+        <Section title={`${t('floor.routes')} (${summary.routes.length})`}>
           {summary.routes.length === 0 ? (
-            <p className="text-xs text-slate-500">No routes yet.</p>
+            <p className="text-xs text-slate-500">{t('floor.noRoutes')}</p>
           ) : (
             <table className="w-full text-[10.5px]">
               <thead>
@@ -404,11 +541,12 @@ function ToolButton({ active, onClick, title, children }: {
 
 /** Link a floor route to the VSM station it feeds — enables the transport audit. */
 function RouteLink({ routeId, linkedNodeId }: { routeId: string; linkedNodeId?: string }) {
+  const { t } = useT()
   const nodes = useApp((s) => s.nodes)
   const stations = nodes.filter((n) => isProcessKind(n.kind))
   return (
     <label className="block space-y-1">
-      <span className="field-label">Feeds VSM station</span>
+      <span className="field-label">{t('floor.feeds')}</span>
       <select
         className="select-mini w-full !py-1.5"
         value={linkedNodeId ?? ''}
@@ -416,7 +554,7 @@ function RouteLink({ routeId, linkedNodeId }: { routeId: string; linkedNodeId?: 
           useApp.getState().updateRoute(routeId, { linkedNodeId: e.target.value || undefined })
         }
       >
-        <option value="">— not linked —</option>
+        <option value="">{t('floor.notLinked')}</option>
         {stations.map((n) => (
           <option key={n.id} value={n.id}>{n.label}</option>
         ))}
@@ -427,11 +565,12 @@ function RouteLink({ routeId, linkedNodeId }: { routeId: string; linkedNodeId?: 
 
 /** Upload / tune the plant-floor drawing rendered under the grid. */
 function FloorPlanPanel() {
+  const { t } = useT()
   const background = useApp((s) => s.spaghetti.background)
   const fileRef = useRef<HTMLInputElement>(null)
   return (
     <Section
-      title="Floor plan underlay"
+      title={t('floor.underlay')}
       right={
         background ? (
           <button className="text-slate-500 hover:text-crit transition-colors" title="Remove floor plan"
@@ -457,10 +596,10 @@ function FloorPlanPanel() {
         }}
       />
       <button className="btn-ghost flex w-full items-center justify-center gap-1.5" onClick={() => fileRef.current?.click()}>
-        <ImagePlus size={13} /> {background ? 'Replace image…' : 'Upload plant layout…'}
+        <ImagePlus size={13} /> {background ? t('floor.replace') : t('floor.upload')}
       </button>
       {background && (
-        <NumberField label="Underlay opacity" unit="%" value={Math.round(background.opacity * 100)} min={5} max={100} step={5} slider
+        <NumberField label={t('floor.opacity')} unit="%" value={Math.round(background.opacity * 100)} min={5} max={100} step={5} slider
           onChange={(v) => useApp.getState().setFloorBackground({ ...background, opacity: v / 100 })} />
       )}
       <p className="text-[10px] leading-relaxed text-slate-500">
@@ -472,6 +611,7 @@ function FloorPlanPanel() {
 }
 
 function RouteReadout({ routeId }: { routeId: string }) {
+  const { t } = useT()
   const spaghetti = useApp((s) => s.spaghetti)
   const demand = useApp((s) => s.demand)
   const calibration = useApp((s) => s.calibration)
@@ -487,18 +627,18 @@ function RouteReadout({ routeId }: { routeId: string }) {
   if (!m) return null
   const perPart = audit.rows.find((r) => r.routeId === routeId)
   const rows: [string, string][] = [
-    ['One-way distance', `${m.meters.toFixed(1)} m`],
-    ['Steps (if walked)', m.steps > 0 ? String(m.steps) : '—'],
-    ['Travel time / shift', `${m.minutesPerShift.toFixed(1)} min`],
-    ['Cost / shift', fmtMoney(m.costPerShift, calibration.currency)],
-    ['Cost / year', fmtMoney(m.costPerYear, calibration.currency)],
+    [t('floor.oneWay'), `${m.meters.toFixed(1)} m`],
+    [t('floor.steps'), m.steps > 0 ? String(m.steps) : '—'],
+    [t('floor.travelTime'), `${m.minutesPerShift.toFixed(1)} min`],
+    [t('floor.costShift'), fmtMoney(m.costPerShift, calibration.currency)],
+    [t('floor.costYear'), fmtMoney(m.costPerYear, calibration.currency)],
     ...(perPart
-      ? ([['Transport / part', `${perPart.secondsPerPart.toFixed(1)} s · ${calibration.currency}${perPart.costPerPart.toFixed(3)}`]] as [string, string][])
+      ? ([[t('floor.transportPart'), `${perPart.secondsPerPart.toFixed(1)} s · ${calibration.currency}${perPart.costPerPart.toFixed(3)}`]] as [string, string][])
       : []),
   ]
   return (
     <div className="panel bg-ink p-2 space-y-1">
-      <div className="field-label">Route economics</div>
+      <div className="field-label">{t('floor.economics')}</div>
       {rows.map(([l, v]) => (
         <div key={l} className="flex justify-between text-[11px]">
           <span className="text-slate-500">{l}</span>

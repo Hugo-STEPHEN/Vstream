@@ -44,6 +44,8 @@ export interface VsmNode {
   label: string
   x: number
   y: number
+  /** Custom accent color (hex). Alarm states still override it. */
+  color?: string
   /** Nominal machine cycle time per part, seconds (process-like nodes). */
   ct?: number
   /** Total changeover / setup time, seconds. */
@@ -52,6 +54,12 @@ export interface VsmNode {
   batch?: number
   /** OEE availability ratio, 0.10 – 1.00. */
   availability?: number
+  /** Performance / speed rate (allure), 0.10 – 1.00. Micro-stoppages & slow cycles. */
+  performance?: number
+  /** Engagement ratio: required time ÷ opening time (NF E 60-182), 0 – 1. */
+  engagement?: number
+  /** Opening ratio: opening time ÷ total time (24/7), 0 – 1. */
+  opening?: number
   /** Scrap / defect rate, 0 – 0.95. */
   scrap?: number
   /** Full-time-equivalent headcount at the station. */
@@ -125,6 +133,20 @@ export interface ProcessMetrics {
   /** ctQuality + setupPenalty. */
   ctGrand: number
   availability: number
+  /** Performance / speed rate (allure). */
+  performance: number
+  /** Required ÷ opening time. */
+  engagement: number
+  /** Opening ÷ total time. */
+  opening: number
+  /** 1 − scrap rate. */
+  qualityRate: number
+  /** TRS / OEE = availability × performance × quality (NF E 60-182). */
+  trs: number
+  /** TRG = TRS × engagement (good time ÷ opening time). */
+  trg: number
+  /** TRE = TRG × opening (good time ÷ total calendar time). */
+  tre: number
   scrap: number
   setup: number
   batch: number
@@ -203,11 +225,15 @@ export interface TransportProfile {
 export interface FloorZone {
   id: string
   name: string
+  /** Bounding box (kept in sync with points for polygon zones). */
   x: number
   y: number
   w: number
   h: number
   color: string
+  /** Polygon vertices (absolute coords). When set, the zone renders as a
+   *  polygon — matching non-rectangular plant layouts. */
+  points?: { x: number; y: number }[]
 }
 
 export interface TravelRoute {
@@ -280,8 +306,13 @@ export interface BenchmarkTargetCalibration {
   worldClass: number
 }
 
+/** UI & report language. */
+export type AppLanguage = 'en' | 'fr'
+
 /** Every assumption of the suite, calibratable per project. */
 export interface CalibrationConfig {
+  /** UI, alert and report language. */
+  language: AppLanguage
   /** Currency symbol used across costs and reports. */
   currency: string
   /** Average walking step length, meters (spaghetti step counts). */

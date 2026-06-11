@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Activity, BarChart3, BookOpen, Download, FilePlus2, FlaskConical, FolderOpen, Map as MapIcon,
+  Activity, BarChart3, BookOpen, Download, FilePlus2, FlaskConical, FolderOpen, Gauge, Map as MapIcon,
   Redo2, SlidersHorizontal, Undo2, Waypoints,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useApp, type AppTab } from './store'
+import { useT, type StringKey } from './i18n'
 import { computeSystemMetrics, fmtSeconds } from './lib/analytics'
 import {
   exportBenchmarksCsv, exportMetricsCsv, exportPng, exportProjectJson, exportSpaghettiCsv, exportSvg,
@@ -17,20 +18,23 @@ import { SHEET } from './lib/geometry'
 import { VsmCanvas } from './components/vsm/Canvas'
 import { Toolbox } from './components/vsm/Toolbox'
 import { Inspector } from './components/vsm/Inspector'
+import { StationAnalysisView } from './components/vsm/StationAnalysis'
 import { SpaghettiStudio, FLOOR } from './components/spaghetti/SpaghettiStudio'
 import { AnalyticsView } from './components/analytics/AnalyticsView'
 import { BenchmarkView } from './components/benchmarks/BenchmarkView'
 import { HelpModal } from './components/HelpModal'
 import { CalibrationModal } from './components/CalibrationModal'
 
-const TABS: { id: AppTab; label: string; icon: typeof Waypoints }[] = [
-  { id: 'vsm', label: 'VSM Studio', icon: Waypoints },
-  { id: 'spaghetti', label: 'Spaghetti', icon: MapIcon },
-  { id: 'analytics', label: 'Flow Analytics', icon: FlaskConical },
-  { id: 'benchmarks', label: 'Benchmarks', icon: BarChart3 },
+const TABS: { id: AppTab; labelKey: StringKey; icon: typeof Waypoints }[] = [
+  { id: 'vsm', labelKey: 'tab.vsm', icon: Waypoints },
+  { id: 'station', labelKey: 'tab.station', icon: Gauge },
+  { id: 'spaghetti', labelKey: 'tab.spaghetti', icon: MapIcon },
+  { id: 'analytics', labelKey: 'tab.analytics', icon: FlaskConical },
+  { id: 'benchmarks', labelKey: 'tab.benchmarks', icon: BarChart3 },
 ]
 
 export default function App() {
+  const { t } = useT()
   const tab = useApp((s) => s.tab)
   const setTab = useApp((s) => s.setTab)
   const projectName = useApp((s) => s.projectName)
@@ -56,9 +60,11 @@ export default function App() {
       } else if (e.key === 'Escape') {
         s.cancelConnect()
         s.cancelDraftRoute()
+        s.cancelDraftPoly()
         s.setTool('select')
-      } else if (e.key === 'Enter' && s.tab === 'spaghetti' && s.draftRoute.length >= 2) {
-        s.finishDraftRoute()
+      } else if (e.key === 'Enter' && s.tab === 'spaghetti') {
+        if (s.draftRoute.length >= 2) s.finishDraftRoute()
+        if (s.draftPoly.length >= 3) s.finishDraftPoly()
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         e.preventDefault()
         s.undo()
@@ -90,13 +96,14 @@ export default function App() {
             <Inspector />
           </div>
         )}
+        {tab === 'station' && <StationAnalysisView />}
         {tab === 'spaghetti' && <SpaghettiStudio svgRef={floorSvgRef} />}
         {tab === 'analytics' && <AnalyticsView />}
         {tab === 'benchmarks' && <BenchmarkView />}
       </main>
       <footer className="flex items-center justify-between border-t border-edge bg-panel px-3 py-1 text-[10px] text-slate-600">
-        <span className="font-mono">{projectName} · autosaved locally</span>
-        <span>vStream Suite — VSM · spaghetti · flow analytics · benchmarking</span>
+        <span className="font-mono">{projectName} · {t('footer.autosaved')}</span>
+        <span>{t('footer.tagline')}</span>
       </footer>
     </div>
   )
@@ -117,6 +124,7 @@ function TopBar({
   const setTab = useApp((s) => s.setTab)
   const projectName = useApp((s) => s.projectName)
   const setProjectName = useApp((s) => s.setProjectName)
+  const { lang, t } = useT()
   const [exportOpen, setExportOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [calibrationOpen, setCalibrationOpen] = useState(false)
@@ -180,23 +188,23 @@ function TopBar({
 
       {/* Tabs */}
       <nav className="ml-2 flex rounded-lg border border-edge p-0.5">
-        {TABS.map((t) => {
-          const Icon = t.icon
-          const active = tab === t.id
+        {TABS.map((tabDef) => {
+          const Icon = tabDef.icon
+          const active = tab === tabDef.id
           return (
             <button
-              key={t.id}
+              key={tabDef.id}
               className={`relative flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
                 active ? 'text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
-              onClick={() => setTab(t.id)}
+              onClick={() => setTab(tabDef.id)}
             >
               {active && (
                 <motion.span layoutId="tab-pill" className="absolute inset-0 rounded-md bg-edge/70"
                   transition={{ type: 'spring', duration: 0.4, bounce: 0.15 }} />
               )}
               <Icon size={13} className={`relative ${active ? 'text-flow' : ''}`} />
-              <span className="relative font-display">{t.label}</span>
+              <span className="relative font-display">{t(tabDef.labelKey)}</span>
             </button>
           )
         })}
@@ -211,19 +219,29 @@ function TopBar({
 
       {/* Actions */}
       <div className="flex items-center gap-1 border-l border-edge pl-2">
-        <IconBtn title="Undo (Ctrl+Z)" disabled={!canUndo} onClick={() => useApp.getState().undo()}><Undo2 size={14} /></IconBtn>
-        <IconBtn title="Redo (Ctrl+Shift+Z)" disabled={!canRedo} onClick={() => useApp.getState().redo()}><Redo2 size={14} /></IconBtn>
-        <IconBtn title="New blank project" onClick={() => { if (confirm('Start a blank project? Current work stays in your last export.')) useApp.getState().newProject() }}>
+        <IconBtn title={t('topbar.undo')} disabled={!canUndo} onClick={() => useApp.getState().undo()}><Undo2 size={14} /></IconBtn>
+        <IconBtn title={t('topbar.redo')} disabled={!canRedo} onClick={() => useApp.getState().redo()}><Redo2 size={14} /></IconBtn>
+        <IconBtn title={t('topbar.new')} onClick={() => { if (confirm(t('confirm.new'))) useApp.getState().newProject() }}>
           <FilePlus2 size={14} />
         </IconBtn>
-        <IconBtn title="Load demo value stream" onClick={() => { if (confirm('Load the Acme demo stream? This replaces the current project.')) useApp.getState().loadDemo() }}>
+        <IconBtn title={t('topbar.demo')} onClick={() => { if (confirm(t('confirm.demo'))) useApp.getState().loadDemo() }}>
           <FlaskConical size={14} />
         </IconBtn>
-        <IconBtn title="Import project JSON" onClick={() => fileRef.current?.click()}><FolderOpen size={14} /></IconBtn>
-        <IconBtn title="Model calibration — thresholds, transport economics, benchmark targets" onClick={() => setCalibrationOpen(true)}>
+        <IconBtn title={t('topbar.import')} onClick={() => fileRef.current?.click()}><FolderOpen size={14} /></IconBtn>
+        <IconBtn title={t('topbar.calibration')} onClick={() => setCalibrationOpen(true)}>
           <SlidersHorizontal size={14} />
         </IconBtn>
-        <IconBtn title="Need definitions & formulas" onClick={() => setHelpOpen(true)}><BookOpen size={14} /></IconBtn>
+        <IconBtn title={t('topbar.help')} onClick={() => setHelpOpen(true)}><BookOpen size={14} /></IconBtn>
+        <button
+          className="rounded-md border border-edge px-1.5 py-1 font-mono text-[10px] text-slate-400 transition-colors hover:border-steel hover:text-white"
+          title={t('topbar.language')}
+          onClick={() => {
+            const st = useApp.getState()
+            st.setCalibration({ ...st.calibration, language: lang === 'fr' ? 'en' : 'fr' })
+          }}
+        >
+          {lang === 'fr' ? 'FR' : 'EN'}
+        </button>
         <CalibrationModal open={calibrationOpen} onClose={() => setCalibrationOpen(false)} />
         <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
         <input ref={fileRef} type="file" accept=".json,application/json" className="hidden"
@@ -243,7 +261,7 @@ function TopBar({
               hover:bg-flow/20 transition-colors"
             onClick={() => setExportOpen((o) => !o)}
           >
-            <Download size={13} /> Export
+            <Download size={13} /> {t('topbar.export')}
           </button>
           <AnimatePresence>
             {exportOpen && (
@@ -254,13 +272,13 @@ function TopBar({
               >
                 {(
                   [
-                    ['report', 'Executive report (.html)', 'Print-ready full audit — open & File → Print to PDF'],
-                    ['json', 'Project file (.vstream.json)', 'Full model incl. scenarios — re-importable'],
-                    ['csv', 'VSM metrics (.csv)', 'Audited cycle times, PCE report'],
-                    ['csv-floor', 'Spaghetti economics (.csv)', 'Distances, costs, ROI per route'],
-                    ['csv-bench', 'Benchmarks (.csv)', 'Six KPIs vs typical & world class, grade'],
-                    ['svg', `${tab === 'spaghetti' ? 'Floor map' : 'VSM sheet'} (.svg)`, 'Vector — print & slide ready'],
-                    ['png', `${tab === 'spaghetti' ? 'Floor map' : 'VSM sheet'} (.png)`, '2× raster snapshot'],
+                    ['report', t('export.report'), t('export.report.hint')],
+                    ['json', t('export.json'), t('export.json.hint')],
+                    ['csv', t('export.csv'), t('export.csv.hint')],
+                    ['csv-floor', t('export.csvFloor'), t('export.csvFloor.hint')],
+                    ['csv-bench', t('export.csvBench'), t('export.csvBench.hint')],
+                    ['svg', tab === 'spaghetti' ? t('export.svgFloor') : t('export.svgVsm'), t('export.svg.hint')],
+                    ['png', tab === 'spaghetti' ? t('export.pngFloor') : t('export.pngVsm'), t('export.png.hint')],
                   ] as const
                 ).map(([key, label, hint]) => (
                   <button key={key}

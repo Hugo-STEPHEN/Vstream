@@ -2,17 +2,19 @@ import { useMemo, useState } from 'react'
 import {
   Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { Check, Copy, Leaf, Plug, Sparkles, Truck, Zap } from 'lucide-react'
+import { Check, Copy, Leaf, Microscope, Plug, Sparkles, Truck, Zap } from 'lucide-react'
 import { useApp } from '../../store'
 import { computeSystemMetrics, fmtSeconds } from '../../lib/analytics'
 import { buildCopilotPrompt, generateKaizenSuggestions } from '../../lib/copilot'
 import { computeTransportAudit } from '../../lib/spaghetti'
 import { Badge, Section, Stat } from '../ui'
+import { useT } from '../../i18n'
 import { ScenarioBar } from './ScenarioBar'
 import { SensitivityExplorer } from './SensitivityExplorer'
 import type { MetricsUpdatePayload } from '../../types'
 
 export function AnalyticsView() {
+  const { t } = useT()
   const nodes = useApp((s) => s.nodes)
   const demand = useApp((s) => s.demand)
   const spaghetti = useApp((s) => s.spaghetti)
@@ -43,18 +45,18 @@ export function AnalyticsView() {
     <div className="grid h-full grid-cols-1 content-start gap-2 overflow-y-auto p-2 xl:grid-cols-2">
       {/* Sandbox summary header spans both columns */}
       <div className="xl:col-span-2 flex flex-wrap gap-2">
-        <Stat label="Takt" value={fmtSeconds(metrics.taktSeconds)} tone="flow" sub={`${metrics.demandPerDay} u/day demand`} />
-        <Stat label="Capacity" value={`${Math.floor(metrics.systemCapacityPerDay)} u/day`}
+        <Stat label={t('ana.takt')} value={fmtSeconds(metrics.taktSeconds)} tone="flow" sub={`${metrics.demandPerDay} ${t('ana.demandSub')}`} />
+        <Stat label={t('ana.capacity')} value={`${Math.floor(metrics.systemCapacityPerDay)} u/day`}
           tone={metrics.systemCapacityPerDay >= metrics.demandPerDay ? 'good' : 'crit'}
-          sub={metrics.bottleneck ? `limited by ${metrics.bottleneck.label}` : '—'} />
-        <Stat label="Lead time" value={fmtDaysStat(metrics.leadTimeSeconds, metrics.availableSecondsPerDay)} />
+          sub={metrics.bottleneck ? `${t('ana.limitedBy')} ${metrics.bottleneck.label}` : '—'} />
+        <Stat label={t('ana.leadTime')} value={fmtDaysStat(metrics.leadTimeSeconds, metrics.availableSecondsPerDay)} />
         <Stat label="PCE" value={`${metrics.pce.toFixed(2)}%`} tone={metrics.pce >= 25 ? 'good' : metrics.pce >= 5 ? 'warn' : 'crit'} />
-        <Stat label="First pass yield" value={`${(metrics.firstPassYield * 100).toFixed(1)}%`}
+        <Stat label={t('ana.fpy')} value={`${(metrics.firstPassYield * 100).toFixed(1)}%`}
           tone={metrics.firstPassYield > 0.97 ? 'good' : 'warn'} />
-        <Stat label="Direct labor" value={`${metrics.totalOperators.toFixed(1)} FTE`}
+        <Stat label={t('ana.labor')} value={`${metrics.totalOperators.toFixed(1)} FTE`}
           sub={`≈ $${Math.round(metrics.totalOperators * demand.laborRatePerHour * (metrics.availableSecondsPerDay / 3600)).toLocaleString()}/day`} />
         {transport.rows.length > 0 && (
-          <Stat label="Transport / part" value={fmtSeconds(transport.totalSecondsPerPart)} tone="warn"
+          <Stat label={t('ana.transportPart')} value={fmtSeconds(transport.totalSecondsPerPart)} tone="warn"
             sub={`${calibration.currency}${transport.totalCostPerPart.toFixed(2)}/part conveyance`} />
         )}
       </div>
@@ -65,7 +67,7 @@ export function AnalyticsView() {
       </div>
 
       {/* Station load vs takt */}
-      <Section title="Station load vs takt — loss decomposition">
+      <Section title={t('ana.loadVsTakt')}>
         {chartData.length === 0 ? (
           <Empty msg="Add process steps on the VSM canvas to populate the audit." />
         ) : (
@@ -102,7 +104,7 @@ export function AnalyticsView() {
       </Section>
 
       {/* Bottleneck audit */}
-      <Section title="Bottleneck audit — audited PCE report">
+      <Section title={t('ana.bottleneckAudit')}>
         {metrics.processes.length === 0 ? (
           <Empty msg="No stations to audit yet." />
         ) : (
@@ -110,7 +112,7 @@ export function AnalyticsView() {
             <table className="w-full text-[11px]">
               <thead>
                 <tr className="text-left text-slate-500">
-                  {['Station', 'CT', 'CT*', 'Load', 'Waste/part', 'Flags'].map((h) => (
+                  {['Station', 'CT', 'CT*', 'Load', 'Waste/part', 'Flags', ''].map((h) => (
                     <th key={h} className="pb-1.5 pr-2 font-medium">{h}</th>
                   ))}
                 </tr>
@@ -136,6 +138,18 @@ export function AnalyticsView() {
                         {p.smedAlert && <Badge tone="warn">SMED</Badge>}
                         {metrics.bottleneck?.nodeId === p.nodeId && <Badge tone="warn">BNECK</Badge>}
                       </td>
+                      <td className="py-1.5 text-right">
+                        <button
+                          className="rounded-md border border-edge p-1 text-slate-500 hover:border-flow/50 hover:text-flow transition-colors"
+                          title="Open rate analysis (TRS / TRG / TRE)"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            useApp.getState().openStationDetail(p.nodeId)
+                          }}
+                        >
+                          <Microscope size={12} />
+                        </button>
+                      </td>
                     </tr>
                   ))}
               </tbody>
@@ -150,7 +164,7 @@ export function AnalyticsView() {
 
       {/* Kaizen co-pilot */}
       <Section
-        title="ValueStream co-pilot — quantified kaizen"
+        title={t('ana.copilot')}
         right={<CopyPromptButton prompt={buildCopilotPrompt(metrics)} />}
       >
         {suggestions.length === 0 ? (
@@ -194,7 +208,7 @@ export function AnalyticsView() {
       <div className="space-y-2">
         {/* VSM ↔ spaghetti transport audit */}
         {transport.rows.length > 0 && (
-          <Section title="Transport audit — spaghetti routes per part">
+          <Section title={t('ana.transportAudit')}>
             <table className="w-full text-[11px]">
               <thead>
                 <tr className="text-left text-slate-500">
@@ -230,7 +244,7 @@ export function AnalyticsView() {
         )}
 
         {/* ESG auditor */}
-        <Section title="ESG carbon & waste auditor (E-VSM)">
+        <Section title={t('ana.esg')}>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <MiniStat icon={<Zap size={12} className="text-warn" />} label="Energy" value={`${metrics.esg.kwhPerDay.toFixed(0)} kWh/d`} />
             <MiniStat icon={<Leaf size={12} className="text-pull" />} label="CO₂e" value={`${metrics.esg.co2KgPerDay.toFixed(0)} kg/d`} />
@@ -251,6 +265,7 @@ export function AnalyticsView() {
 }
 
 function IntegrationsPanel() {
+  const { t } = useT()
   const example: MetricsUpdatePayload = {
     source: 'iot',
     nodeLabel: 'Spot Weld',
@@ -261,7 +276,7 @@ function IntegrationsPanel() {
   const curl = `curl -X POST https://plant.example.com/api/v1/metrics/update \\\n  -H 'Content-Type: application/json' \\\n  -d '${JSON.stringify(example)}'`
   return (
     <Section
-      title="REST / Webhook connectors"
+      title={t('ana.connectors')}
       right={
         <button
           className="btn-ghost flex items-center gap-1"

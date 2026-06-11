@@ -3,7 +3,10 @@ import { useApp } from '../../store'
 import { NODE_LANE } from '../../data/palette'
 import { SHEET, NODE_W, NODE_H } from '../../lib/geometry'
 import { computeSystemMetrics, fmtSeconds, isInventoryKind, isProcessKind } from '../../lib/analytics'
+import { Grid3X3 } from 'lucide-react'
+import { NumberField } from '../ui'
 import { NodeGlyph } from './NodeGlyph'
+import { useT } from '../../i18n'
 import type { NodeKind, SystemMetrics, VsmEdge, VsmNode } from '../../types'
 
 const MONO = 'JetBrains Mono, monospace'
@@ -17,6 +20,7 @@ interface ViewTransform {
 }
 
 export function VsmCanvas({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }) {
+  const { t } = useT()
   const nodes = useApp((s) => s.nodes)
   const edges = useApp((s) => s.edges)
   const demand = useApp((s) => s.demand)
@@ -25,6 +29,8 @@ export function VsmCanvas({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }
   const selectedNodeId = useApp((s) => s.selectedNodeId)
   const selectedEdgeId = useApp((s) => s.selectedEdgeId)
   const calibration = useApp((s) => s.calibration)
+  const prefs = useApp((s) => s.prefs)
+  const [gridOpen, setGridOpen] = useState(false)
 
   const metrics = useMemo(() => computeSystemMetrics(nodes, demand, calibration), [nodes, demand, calibration])
 
@@ -151,14 +157,16 @@ export function VsmCanvas({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }
           <marker id="arrow-info" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
             <path d="M 0 0 L 10 5 L 0 10 z" fill="#818CF8" />
           </marker>
-          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <pattern id="grid" width={prefs.snapStep * 2} height={prefs.snapStep * 2} patternUnits="userSpaceOnUse">
             <circle cx="1" cy="1" r="1" fill="#1E293B" />
           </pattern>
         </defs>
 
         <g data-world transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
           <Lanes />
-          <rect x={0} y={0} width={SHEET.width} height={SHEET.height} fill="url(#grid)" pointerEvents="none" />
+          {prefs.vsmGrid && (
+            <rect x={0} y={0} width={SHEET.width} height={SHEET.height} fill="url(#grid)" pointerEvents="none" />
+          )}
 
           {edges.map((edge) => (
             <EdgeShape
@@ -193,16 +201,35 @@ export function VsmCanvas({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }
         </g>
       </svg>
 
-      {/* zoom controls */}
+      {/* zoom & view controls */}
       <div className="absolute bottom-3 right-3 flex flex-col gap-1">
         <button className="btn-ghost !px-2 font-mono" onClick={() => setView((v) => ({ ...v, k: Math.min(2.5, v.k * 1.2) }))}>+</button>
         <button className="btn-ghost !px-2 font-mono" onClick={() => setView((v) => ({ ...v, k: Math.max(0.2, v.k / 1.2) }))}>−</button>
         <button className="btn-ghost !px-2 font-mono" onClick={fitView}>⊡</button>
+        <button className={`btn-ghost !px-2 ${gridOpen ? '!text-flow' : ''}`} onClick={() => setGridOpen((o) => !o)} title={t('canvas.gridSettings')}>
+          <Grid3X3 size={13} />
+        </button>
       </div>
+      {gridOpen && (
+        <div className="panel absolute bottom-3 right-12 w-48 space-y-2 p-2.5">
+          <label className="flex items-center gap-2 text-xs text-slate-300">
+            <input type="checkbox" className="accent-cyan-400" checked={prefs.vsmGrid}
+              onChange={(e) => useApp.getState().setPrefs({ vsmGrid: e.target.checked })} />
+            {t('canvas.gridShow')}
+          </label>
+          <label className="flex items-center gap-2 text-xs text-slate-300">
+            <input type="checkbox" className="accent-cyan-400" checked={prefs.vsmSnap}
+              onChange={(e) => useApp.getState().setPrefs({ vsmSnap: e.target.checked })} />
+            {t('canvas.gridSnap')}
+          </label>
+          <NumberField label={t('canvas.gridStep')} unit="units" value={prefs.snapStep} min={5} max={100} step={5}
+            onChange={(snapStep) => useApp.getState().setPrefs({ snapStep })} />
+        </div>
+      )}
 
       {tool === 'connect' ? (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 panel px-3 py-1.5 text-xs text-flow font-mono">
-          {connectFrom ? 'Click target node — Esc to cancel' : 'Click source node'}
+          {connectFrom ? t('canvas.connectTarget') : t('canvas.connectSource')}
         </div>
       ) : null}
     </div>
@@ -210,6 +237,7 @@ export function VsmCanvas({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }
 }
 
 function Lanes() {
+  const { t } = useT()
   return (
     <g pointerEvents="none">
       <rect x={0} y={SHEET.info.top} width={SHEET.width} height={SHEET.info.bottom - SHEET.info.top} fill="#818CF8" opacity={0.03} />
@@ -220,9 +248,9 @@ function Lanes() {
       ))}
       {(
         [
-          ['INFORMATION FLOW', SHEET.info.top + 24, '#818CF8'],
-          ['MATERIAL FLOW', SHEET.material.top + 24, '#22D3EE'],
-          ['TIMELINE LADDER — VA / NVA', SHEET.timeline.top + 24, '#FBBF24'],
+          [t('canvas.laneInfo'), SHEET.info.top + 24, '#818CF8'],
+          [t('canvas.laneMaterial'), SHEET.material.top + 24, '#22D3EE'],
+          [t('canvas.laneTimeline'), SHEET.timeline.top + 24, '#FBBF24'],
         ] as const
       ).map(([label, y, color]) => (
         <text key={label} x={16} y={y} fill={color} opacity={0.55} fontSize={13} fontFamily={DISPLAY} letterSpacing={3}>
@@ -339,6 +367,7 @@ function NodeShape({
   isConnectSource: boolean
   onPointerDown: (e: React.PointerEvent, node: VsmNode) => void
 }) {
+  const { t } = useT()
   const pm = metrics.processes.find((p) => p.nodeId === node.id)
   const im = metrics.inventories.find((i) => i.nodeId === node.id)
   const isBottleneck = metrics.bottleneck?.nodeId === node.id && metrics.processes.length > 1
@@ -350,15 +379,18 @@ function NodeShape({
       ? '#FBBF24'
       : selected || isConnectSource
         ? '#22D3EE'
-        : NODE_LANE[node.kind] === 'information'
-          ? '#818CF8'
-          : '#94A3B8'
+        : node.color ??
+          (NODE_LANE[node.kind] === 'information' ? '#818CF8' : '#94A3B8')
 
   return (
     <g
       transform={`translate(${node.x} ${node.y})`}
       color={color}
       onPointerDown={(e) => onPointerDown(e, node)}
+      onDoubleClick={(e) => {
+        e.stopPropagation()
+        if (isProcessKind(node.kind)) useApp.getState().openStationDetail(node.id)
+      }}
       className={connecting ? 'cursor-crosshair' : 'cursor-grab'}
     >
       {(selected || isConnectSource) && (
@@ -404,12 +436,12 @@ function NodeShape({
       ) : null}
       {isBottleneck && !overTakt ? (
         <text x={0} y={-NODE_H / 2 - 26} textAnchor="middle" fill="#FBBF24" fontFamily={MONO} fontSize={9}>
-          ▲ BOTTLENECK
+          {t('canvas.bottleneck')}
         </text>
       ) : null}
       {overTakt ? (
         <text x={0} y={-NODE_H / 2 - 26} textAnchor="middle" fill="#F87171" fontFamily={MONO} fontSize={9}>
-          ■ OVER TAKT
+          {t('canvas.overTakt')}
         </text>
       ) : null}
     </g>
@@ -421,12 +453,13 @@ function NodeShape({
 // ---------------------------------------------------------------------------
 
 function TimelineLadder({ metrics }: { metrics: SystemMetrics }) {
+  const { t } = useT()
   const { ladder, leadTimeSeconds, totalValueAddSeconds, totalNvaSeconds, pce, availableSecondsPerDay } = metrics
   if (ladder.length === 0) {
     return (
       <text x={SHEET.width / 2} y={(SHEET.timeline.top + SHEET.timeline.bottom) / 2} textAnchor="middle"
         fill="#475569" fontSize={13} fontFamily={UI_FONT}>
-        Drop process steps and inventory into the material lane — the VA/NVA ladder builds itself.
+        {t('canvas.emptyLadder')}
       </text>
     )
   }
@@ -482,12 +515,12 @@ function TimelineLadder({ metrics }: { metrics: SystemMetrics }) {
       {/* Totals box */}
       <g transform={`translate(${right + 24} ${SHEET.timeline.top + 46})`}>
         <rect x={0} y={0} width={270} height={150} rx={8} fill="#0B0F19" stroke="#1E293B" />
-        <text x={16} y={28} fill="#94A3B8" fontFamily={DISPLAY} fontSize={11} letterSpacing={2}>FLOW SUMMARY</text>
+        <text x={16} y={28} fill="#94A3B8" fontFamily={DISPLAY} fontSize={11} letterSpacing={2}>{t('canvas.flowSummary')}</text>
         {(
           [
-            ['Lead time', fmtDays(leadTimeSeconds, availableSecondsPerDay), '#E2E8F0'],
-            ['Value-add', fmtSeconds(totalValueAddSeconds), '#34D399'],
-            ['Non-value-add', fmtDays(totalNvaSeconds, availableSecondsPerDay), '#FBBF24'],
+            [t('canvas.leadTime'), fmtDays(leadTimeSeconds, availableSecondsPerDay), '#E2E8F0'],
+            [t('canvas.valueAdd'), fmtSeconds(totalValueAddSeconds), '#34D399'],
+            [t('canvas.nva'), fmtDays(totalNvaSeconds, availableSecondsPerDay), '#FBBF24'],
             ['PCE', `${pce.toFixed(2)}%`, pce >= 25 ? '#34D399' : pce >= 5 ? '#FBBF24' : '#F87171'],
           ] as const
         ).map(([label, value, color], i) => (

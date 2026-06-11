@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import { PALETTE, type PaletteEntry } from '../../data/palette'
 import { fuzzyFilter } from '../../lib/fuzzy'
 import { useApp } from '../../store'
+import { useT } from '../../i18n'
 import { NodeGlyph } from './NodeGlyph'
 import { SHEET } from '../../lib/geometry'
 import type { EdgeKind } from '../../types'
@@ -16,6 +17,7 @@ const EDGE_TOOLS: { kind: EdgeKind; label: string; hint: string }[] = [
 ]
 
 export function Toolbox() {
+  const { t } = useT()
   const [open, setOpen] = useState(true)
   const [tab, setTab] = useState<'simple' | 'full'>('simple')
   const [query, setQuery] = useState('')
@@ -59,7 +61,7 @@ export function Toolbox() {
                   onClick={() => setTool('select')}
                   title="Select & move (V)"
                 >
-                  <MousePointer2 size={13} /> Select
+                  <MousePointer2 size={13} /> {t('toolbox.select')}
                 </button>
                 {EDGE_TOOLS.map((et) => (
                   <button
@@ -84,7 +86,7 @@ export function Toolbox() {
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search elements… (kanban, fifo)"
+                    placeholder={t('toolbox.search')}
                     className="w-full bg-ink border border-edge rounded-md pl-7 pr-7 py-1.5 text-xs text-slate-200
                       focus:outline-none focus:border-flow/70 transition-colors"
                   />
@@ -95,15 +97,15 @@ export function Toolbox() {
                   )}
                 </div>
                 <div className="mt-2 flex rounded-md border border-edge overflow-hidden">
-                  {(['simple', 'full'] as const).map((t) => (
+                  {(['simple', 'full'] as const).map((mode) => (
                     <button
-                      key={t}
+                      key={mode}
                       className={`flex-1 py-1 text-[11px] font-display uppercase tracking-wider transition-colors ${
-                        tab === t ? 'bg-edge/60 text-white' : 'text-slate-500 hover:text-slate-300'
+                        tab === mode ? 'bg-edge/60 text-white' : 'text-slate-500 hover:text-slate-300'
                       }`}
-                      onClick={() => setTab(t)}
+                      onClick={() => setTab(mode)}
                     >
-                      {t === 'simple' ? 'Simple flow' : 'Full suite'}
+                      {mode === 'simple' ? t('toolbox.simple') : t('toolbox.full')}
                     </button>
                   ))}
                 </div>
@@ -112,7 +114,7 @@ export function Toolbox() {
               {/* Element grid */}
               <div className="flex-1 overflow-y-auto p-2 space-y-3">
                 {grouped.length === 0 && (
-                  <p className="text-xs text-slate-500 px-1 pt-2">No element matches “{query}”.</p>
+                  <p className="text-xs text-slate-500 px-1 pt-2">{t('toolbox.noMatch')} “{query}”.</p>
                 )}
                 {grouped.map(([category, items]) => (
                   <div key={category}>
@@ -126,8 +128,7 @@ export function Toolbox() {
                 ))}
               </div>
               <div className="border-t border-edge p-2 text-[10px] text-slate-500 leading-relaxed">
-                Drag onto the canvas, or click to place. Lanes are enforced: control elements stay in the
-                information zone, physical nodes in the material zone.
+                {t('toolbox.hint')}
               </div>
             </div>
           </motion.aside>
