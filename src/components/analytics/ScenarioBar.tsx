@@ -68,24 +68,21 @@ export function ScenarioBar() {
               focus:border-flow/70 focus:outline-none transition-colors"
           />
           <button className="btn-ghost flex items-center gap-1 !text-flow hover:!border-flow/50" onClick={save}
-            title="Freeze the current stations, connections and demand as a named scenario">
+            title={t('ana.saveHint')}>
             <Camera size={12} /> {t('ana.saveCurrent')}
           </button>
         </div>
       }
     >
       {rows.length === 1 ? (
-        <p className="text-xs text-slate-500">
-          No scenarios yet. Save the current model as a baseline, then change parameters on the canvas
-          (or apply kaizen suggestions) and save again — every saved state is compared here side by side.
-        </p>
+        <p className="text-xs text-slate-500">{t('ana.noScenarios')}</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-[11px]">
             <thead>
               <tr className="text-left text-slate-500">
-                {['Scenario', 'Lead time', 'PCE', 'Capacity', 'FPY', 'Grade', ''].map((h) => (
-                  <th key={h} className="pb-1.5 pr-3 font-medium">{h}</th>
+                {[t('ana.thScenario'), t('ana.thLeadTime'), 'PCE', t('ana.thCapacity'), 'FPY', t('ana.thGrade'), ''].map((h, i) => (
+                  <th key={i} className="pb-1.5 pr-3 font-medium">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -121,11 +118,11 @@ export function ScenarioBar() {
                     <td className="py-1.5 text-right">
                       {!isBase && r.id && (
                         <span className="flex justify-end gap-1">
-                          <button className="btn-ghost flex items-center gap-1 !py-1" title="Apply this scenario to the canvas (undoable)"
+                          <button className="btn-ghost flex items-center gap-1 !py-1" title={t('ana.applyScenarioHint')}
                             onClick={() => useApp.getState().applyScenario(r.id as string)}>
                             <CornerUpLeft size={11} /> {t('ana.apply')}
                           </button>
-                          <button className="btn-ghost !py-1 hover:!text-crit" title="Delete scenario"
+                          <button className="btn-ghost !py-1 hover:!text-crit" title={t('ana.deleteScenario')}
                             onClick={() => useApp.getState().deleteScenario(r.id as string)}>
                             <Trash2 size={11} />
                           </button>
@@ -139,10 +136,7 @@ export function ScenarioBar() {
           </table>
         </div>
       )}
-      <p className="text-[10.5px] text-slate-500">
-        Deltas are measured against the live model. Scenarios freeze stations, connections and demand —
-        they are saved with the project file and survive export/import.
-      </p>
+      <p className="text-[10.5px] text-slate-500">{t('ana.scenarioNote')}</p>
     </Section>
   )
 }

@@ -4,12 +4,12 @@ import {
 } from 'recharts'
 import { useApp } from '../../store'
 import { computeSystemMetrics } from '../../lib/analytics'
-import { computeBenchmarks, overallGrade } from '../../lib/benchmarks'
+import { BENCHMARK_META, computeBenchmarks, overallGrade } from '../../lib/benchmarks'
 import { Section } from '../ui'
 import { useT } from '../../i18n'
 
 export function BenchmarkView() {
-  const { t } = useT()
+  const { lang, t } = useT()
   const nodes = useApp((s) => s.nodes)
   const demand = useApp((s) => s.demand)
   const calibration = useApp((s) => s.calibration)
@@ -17,11 +17,11 @@ export function BenchmarkView() {
   const rows = useMemo(() => computeBenchmarks(metrics, calibration), [metrics, calibration])
   const grade = overallGrade(rows)
 
+  const wc = t('bench.worldClass')
   const radarData = rows.map((r) => ({
-    metric: r.metric.replace('Process cycle efficiency', 'PCE').replace('Average availability (OEE-A)', 'OEE-A'),
-    Current: Math.round(r.score),
-    'World class': 100,
-    Typical: 0,
+    metric: BENCHMARK_META[r.key].short[lang],
+    [t('bench.currentPlant')]: Math.round(r.score),
+    [wc]: 100,
   }))
 
   const gradeColor =
@@ -40,10 +40,7 @@ export function BenchmarkView() {
             </div>
             <div>
               <div className="font-mono text-2xl text-slate-100">{grade.score.toFixed(0)}<span className="text-sm text-slate-500"> / 100</span></div>
-              <div className="text-[11px] leading-snug text-slate-500">
-                Composite of six lean KPIs scored against typical batch-and-queue plants (0) and
-                world-class lean references (100).
-              </div>
+              <div className="text-[11px] leading-snug text-slate-500">{t('bench.gradeDesc')}</div>
             </div>
           </div>
         </Section>
@@ -55,8 +52,8 @@ export function BenchmarkView() {
                 <PolarGrid stroke="#1E293B" />
                 <PolarAngleAxis dataKey="metric" tick={{ fill: '#94A3B8', fontSize: 10, fontFamily: 'Inter' }} />
                 <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
-                <Radar name="World class" dataKey="World class" stroke="#334155" fill="#334155" fillOpacity={0.12} />
-                <Radar name="Current plant" dataKey="Current" stroke="#22D3EE" fill="#22D3EE" fillOpacity={0.32} />
+                <Radar name={wc} dataKey={wc} stroke="#334155" fill="#334155" fillOpacity={0.12} />
+                <Radar name={t('bench.currentPlant')} dataKey={t('bench.currentPlant')} stroke="#22D3EE" fill="#22D3EE" fillOpacity={0.32} />
                 <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'Inter' }} />
               </RadarChart>
             </ResponsiveContainer>
@@ -69,7 +66,7 @@ export function BenchmarkView() {
           <table className="w-full text-[11.5px]">
             <thead>
               <tr className="text-left text-slate-500">
-                {['Metric', 'Current', 'Typical', 'World class', 'Position'].map((h) => (
+                {[t('bench.thMetric'), t('bench.thCurrent'), t('bench.thTypical'), t('bench.thWorldClass'), t('bench.thPosition')].map((h) => (
                   <th key={h} className="pb-2 pr-3 font-medium">{h}</th>
                 ))}
               </tr>
@@ -100,10 +97,7 @@ export function BenchmarkView() {
             </tbody>
           </table>
         </div>
-        <p className="text-[10.5px] text-slate-500">
-          References are established lean rules of thumb (Rother &amp; Shook PCE bands, ~85% world-class OEE,
-          SMED &lt; 5% setup share) — orientation values to steer kaizen priorities, not certified statistics.
-        </p>
+        <p className="text-[10.5px] text-slate-500">{t('bench.note')}</p>
       </Section>
     </div>
   )

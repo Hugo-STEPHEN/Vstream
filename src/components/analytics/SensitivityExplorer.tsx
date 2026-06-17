@@ -43,8 +43,8 @@ export function SensitivityExplorer() {
 
   if (stations.length === 0) {
     return (
-      <Section title="Sensitivity explorer">
-        <p className="py-6 text-center text-xs text-slate-500">Add process steps on the VSM canvas to sweep parameters.</p>
+      <Section title={t('ana.sensitivityShort')}>
+        <p className="py-6 text-center text-xs text-slate-500">{t('ana.sweepEmpty')}</p>
       </Section>
     )
   }
@@ -96,10 +96,7 @@ export function SensitivityExplorer() {
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <p className="text-[10.5px] text-slate-500">
-        25 honest re-simulations of the whole stream — no interpolation. The dashed marker is the
-        current value; everything else on the model is held constant.
-      </p>
+      <p className="text-[10.5px] text-slate-500">{t('ana.sweepNote')}</p>
     </Section>
   )
 }

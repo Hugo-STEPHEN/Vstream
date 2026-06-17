@@ -14,7 +14,7 @@ import { SensitivityExplorer } from './SensitivityExplorer'
 import type { MetricsUpdatePayload } from '../../types'
 
 export function AnalyticsView() {
-  const { t } = useT()
+  const { lang, t } = useT()
   const nodes = useApp((s) => s.nodes)
   const demand = useApp((s) => s.demand)
   const spaghetti = useApp((s) => s.spaghetti)
@@ -53,8 +53,8 @@ export function AnalyticsView() {
         <Stat label="PCE" value={`${metrics.pce.toFixed(2)}%`} tone={metrics.pce >= 25 ? 'good' : metrics.pce >= 5 ? 'warn' : 'crit'} />
         <Stat label={t('ana.fpy')} value={`${(metrics.firstPassYield * 100).toFixed(1)}%`}
           tone={metrics.firstPassYield > 0.97 ? 'good' : 'warn'} />
-        <Stat label={t('ana.labor')} value={`${metrics.totalOperators.toFixed(1)} FTE`}
-          sub={`≈ $${Math.round(metrics.totalOperators * demand.laborRatePerHour * (metrics.availableSecondsPerDay / 3600)).toLocaleString()}/day`} />
+        <Stat label={t('ana.labor')} value={`${metrics.totalOperators.toFixed(1)} ${lang === 'fr' ? 'ETP' : 'FTE'}`}
+          sub={`≈ ${calibration.currency}${Math.round(metrics.totalOperators * demand.laborRatePerHour * (metrics.availableSecondsPerDay / 3600)).toLocaleString()}/${lang === 'fr' ? 'jour' : 'day'}`} />
         {transport.rows.length > 0 && (
           <Stat label={t('ana.transportPart')} value={fmtSeconds(transport.totalSecondsPerPart)} tone="warn"
             sub={`${calibration.currency}${transport.totalCostPerPart.toFixed(2)}/part conveyance`} />
@@ -69,7 +69,7 @@ export function AnalyticsView() {
       {/* Station load vs takt */}
       <Section title={t('ana.loadVsTakt')}>
         {chartData.length === 0 ? (
-          <Empty msg="Add process steps on the VSM canvas to populate the audit." />
+          <Empty msg={t('ana.loadEmpty')} />
         ) : (
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -97,23 +97,20 @@ export function AnalyticsView() {
             </ResponsiveContainer>
           </div>
         )}
-        <p className="text-[10.5px] text-slate-500">
-          Green is honest work; everything above it is overhead from downtime, defects and changeovers.
-          Bars crossing the red line cannot meet demand.
-        </p>
+        <p className="text-[10.5px] text-slate-500">{t('ana.loadNote')}</p>
       </Section>
 
       {/* Bottleneck audit */}
       <Section title={t('ana.bottleneckAudit')}>
         {metrics.processes.length === 0 ? (
-          <Empty msg="No stations to audit yet." />
+          <Empty msg={t('ana.auditEmpty')} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-[11px]">
               <thead>
                 <tr className="text-left text-slate-500">
-                  {['Station', 'CT', 'CT*', 'Load', 'Waste/part', 'Flags', ''].map((h) => (
-                    <th key={h} className="pb-1.5 pr-2 font-medium">{h}</th>
+                  {[t('ana.thStation'), 'CT', 'CT*', t('ana.thLoad'), t('ana.thWaste'), t('ana.thFlags'), ''].map((h, i) => (
+                    <th key={i} className="pb-1.5 pr-2 font-medium">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -141,7 +138,7 @@ export function AnalyticsView() {
                       <td className="py-1.5 text-right">
                         <button
                           className="rounded-md border border-edge p-1 text-slate-500 hover:border-flow/50 hover:text-flow transition-colors"
-                          title="Open rate analysis (TRS / TRG / TRE)"
+                          title={t('ana.openRate')}
                           onClick={(e) => {
                             e.stopPropagation()
                             useApp.getState().openStationDetail(p.nodeId)
@@ -156,10 +153,7 @@ export function AnalyticsView() {
             </table>
           </div>
         )}
-        <p className="text-[10.5px] text-slate-500">
-          Waste/part = CT* − nominal CT: the audited overhead each part carries through the station.
-          Click a row to open it on the canvas.
-        </p>
+        <p className="text-[10.5px] text-slate-500">{t('ana.bottleneckNote')}</p>
       </Section>
 
       {/* Kaizen co-pilot */}
@@ -168,7 +162,7 @@ export function AnalyticsView() {
         right={<CopyPromptButton prompt={buildCopilotPrompt(metrics)} />}
       >
         {suggestions.length === 0 ? (
-          <Empty msg="No high-leverage countermeasure found — this stream is already tight." />
+          <Empty msg={t('ana.copilotEmpty')} />
         ) : (
           <div className="space-y-1.5">
             {suggestions.map((sug) => (
@@ -187,19 +181,16 @@ export function AnalyticsView() {
                 </div>
                 <button
                   className="btn-ghost shrink-0 !text-pull hover:!border-pull/50"
-                  title="Apply this parameter change to the model"
+                  title={t('ana.applyHint')}
                   onClick={() => updateNode(sug.nodeId, sug.patch)}
                 >
-                  Apply
+                  {t('ana.apply')}
                 </button>
               </div>
             ))}
           </div>
         )}
-        <p className="text-[10.5px] text-slate-500">
-          Every impact is recomputed through the full engine — apply a countermeasure and the canvas,
-          ladder and benchmarks update instantly. “Copy prompt” exports the grounding context for an LLM co-pilot.
-        </p>
+        <p className="text-[10.5px] text-slate-500">{t('ana.copilotNote')}</p>
       </Section>
 
       {/* Sensitivity curves */}
@@ -212,8 +203,8 @@ export function AnalyticsView() {
             <table className="w-full text-[11px]">
               <thead>
                 <tr className="text-left text-slate-500">
-                  {['Route → station', 'Mode', 'Time/part', '$/part'].map((h) => (
-                    <th key={h} className="pb-1 pr-2 font-medium">{h}</th>
+                  {[t('ana.thRouteStation'), 'Mode', t('ana.thTimePart'), `${calibration.currency}/${lang === 'fr' ? 'pièce' : 'part'}`].map((h, i) => (
+                    <th key={i} className="pb-1 pr-2 font-medium">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -235,25 +226,22 @@ export function AnalyticsView() {
                 ))}
               </tbody>
             </table>
-            <p className="text-[10.5px] text-slate-500">
-              Conveyance seconds each produced part carries on floor routes linked to VSM stations
-              (link routes in the Spaghetti inspector). Transport is pure muda — compare it to the
-              stations' cycle times.
-            </p>
+            <p className="text-[10.5px] text-slate-500">{t('ana.transportNote')}</p>
           </Section>
         )}
 
         {/* ESG auditor */}
         <Section title={t('ana.esg')}>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <MiniStat icon={<Zap size={12} className="text-warn" />} label="Energy" value={`${metrics.esg.kwhPerDay.toFixed(0)} kWh/d`} />
+            <MiniStat icon={<Zap size={12} className="text-warn" />} label={t('ana.energy')} value={`${metrics.esg.kwhPerDay.toFixed(0)} kWh/d`} />
             <MiniStat icon={<Leaf size={12} className="text-pull" />} label="CO₂e" value={`${metrics.esg.co2KgPerDay.toFixed(0)} kg/d`} />
-            <MiniStat icon={<Leaf size={12} className="text-crit" />} label="Scrap" value={`${metrics.esg.scrapUnitsPerDay.toFixed(0)} u/d`} />
-            <MiniStat icon={<Leaf size={12} className="text-crit" />} label="Scrap mass" value={`${metrics.esg.scrapKgPerDay.toFixed(0)} kg/d`} />
+            <MiniStat icon={<Leaf size={12} className="text-crit" />} label={t('ana.scrap')} value={`${metrics.esg.scrapUnitsPerDay.toFixed(0)} u/d`} />
+            <MiniStat icon={<Leaf size={12} className="text-crit" />} label={t('ana.scrapMass')} value={`${metrics.esg.scrapKgPerDay.toFixed(0)} kg/d`} />
           </div>
           <p className="text-[10.5px] text-slate-500">
-            Driven by each station's kW profile and scrap rate at {demand.partWeightKg} kg/part and{' '}
-            {demand.gridCo2PerKwh} kg CO₂e/kWh (set per station in the inspector).
+            {lang === 'fr'
+              ? `Calculé à partir du profil kW et du taux de rebut de chaque poste, à ${demand.partWeightKg} kg/pièce et ${demand.gridCo2PerKwh} kg CO₂e/kWh (réglé par poste dans l'inspecteur).`
+              : `Driven by each station's kW profile and scrap rate at ${demand.partWeightKg} kg/part and ${demand.gridCo2PerKwh} kg CO₂e/kWh (set per station in the inspector).`}
           </p>
         </Section>
 
@@ -287,16 +275,15 @@ function IntegrationsPanel() {
             })
           }}
         >
-          {copied ? <Check size={11} /> : <Copy size={11} />} {copied ? 'Copied' : 'Copy curl'}
+          {copied ? <Check size={11} /> : <Copy size={11} />} {copied ? t('common.copied') : t('ana.copyCurl')}
         </button>
       }
     >
       <div className="flex items-start gap-2">
         <Plug size={14} className="mt-0.5 shrink-0 text-info" />
         <p className="text-[11px] leading-relaxed text-slate-400">
-          Edge IoT devices, barcode scanners and MES databases can pipe measured cycle times straight
-          into this model via <span className="font-mono text-flow">POST /api/v1/metrics/update</span>.
-          The typed payload contract ships with the app (<span className="font-mono">MetricsUpdatePayload</span>).
+          {t('ana.connectorsBody1')} <span className="font-mono text-flow">POST /api/v1/metrics/update</span>.
+          {' '}{t('ana.connectorsBody2')} (<span className="font-mono">MetricsUpdatePayload</span>).
         </p>
       </div>
       <pre className="overflow-x-auto rounded-md border border-edge bg-ink p-2 font-mono text-[10px] leading-relaxed text-slate-400">
@@ -329,6 +316,7 @@ function MiniStat({ icon, label, value }: { icon: React.ReactNode; label: string
 }
 
 function CopyPromptButton({ prompt }: { prompt: string }) {
+  const { t } = useT()
   const [copied, setCopied] = useState(false)
   return (
     <button
@@ -340,7 +328,7 @@ function CopyPromptButton({ prompt }: { prompt: string }) {
         })
       }}
     >
-      {copied ? <Check size={11} /> : <Copy size={11} />} {copied ? 'Copied' : 'Copy prompt'}
+      {copied ? <Check size={11} /> : <Copy size={11} />} {copied ? t('common.copied') : t('ana.copyPrompt')}
     </button>
   )
 }

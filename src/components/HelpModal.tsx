@@ -6,14 +6,16 @@ import { exportDefinitionsCsv } from '../lib/exporters'
 import { fuzzyFilter } from '../lib/fuzzy'
 import { useT } from '../i18n'
 
-const SHORTCUTS: [string, string][] = [
-  ['V', 'Select & move tool (VSM)'],
-  ['Del / Backspace', 'Delete selected node, connection, zone or route'],
-  ['Esc', 'Cancel connection / draft route, back to select'],
-  ['Enter', 'Commit the draft route (Spaghetti)'],
-  ['Ctrl+Z / Ctrl+Shift+Z', 'Undo / redo'],
-  ['Mouse wheel', 'Zoom the VSM sheet (cursor-centered)'],
-  ['Drag background', 'Pan the VSM sheet'],
+import type { StringKey } from '../i18n'
+
+const SHORTCUTS: [string, StringKey][] = [
+  ['V', 'help.sc.v'],
+  ['Del / Backspace', 'help.sc.del'],
+  ['Esc', 'help.sc.esc'],
+  ['Enter', 'help.sc.enter'],
+  ['Ctrl+Z / Ctrl+Shift+Z', 'help.sc.undo'],
+  ['Mouse wheel', 'help.sc.wheel'],
+  ['Drag background', 'help.sc.pan'],
 ]
 
 export function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -50,11 +52,11 @@ export function HelpModal({ open, onClose }: { open: boolean; onClose: () => voi
               <button
                 className="btn-ghost ml-auto flex items-center gap-1.5"
                 onClick={exportDefinitionsCsv}
-                title="Download the full data dictionary as CSV"
+                title={t('help.dictionaryHint')}
               >
                 <Download size={12} /> {t('help.dictionary')}
               </button>
-              <button className="rounded-md p-1.5 text-slate-400 hover:text-white transition-colors" onClick={onClose} title="Close (Esc)">
+              <button className="rounded-md p-1.5 text-slate-400 hover:text-white transition-colors" onClick={onClose} title={t('help.close')}>
                 <X size={16} />
               </button>
             </header>
@@ -96,7 +98,7 @@ export function HelpModal({ open, onClose }: { open: boolean; onClose: () => voi
                 )
               })}
               {filtered.length === 0 && (
-                <p className="py-8 text-center text-xs text-slate-500">No definition matches “{query}”.</p>
+                <p className="py-8 text-center text-xs text-slate-500">{t('help.noMatch')} “{query}”.</p>
               )}
 
               {!query && (
@@ -108,7 +110,7 @@ export function HelpModal({ open, onClose }: { open: boolean; onClose: () => voi
                     {SHORTCUTS.map(([key, what], i) => (
                       <div key={key} className={`flex items-center gap-3 px-3 py-1.5 ${i > 0 ? 'border-t border-edge/60' : ''}`}>
                         <kbd className="rounded border border-edge bg-ink px-1.5 py-0.5 font-mono text-[10px] text-flow">{key}</kbd>
-                        <span className="text-[11px] text-slate-400">{what}</span>
+                        <span className="text-[11px] text-slate-400">{t(what)}</span>
                       </div>
                     ))}
                   </div>

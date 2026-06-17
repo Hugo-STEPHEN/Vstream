@@ -117,7 +117,7 @@ export function StationAnalysisView() {
       <div className="min-h-0 space-y-3 overflow-y-auto p-3">
         <div className="flex items-center gap-2">
           <h2 className="font-display text-base font-semibold text-white">{node.label}</h2>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">rate analysis · {node.kind}</span>
+          <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">{t('station.header')} · {node.kind}</span>
           {m.exceedsTakt && <Badge tone="crit">OVER TAKT</Badge>}
           {metrics.bottleneck?.nodeId === m.nodeId && <Badge tone="warn">BOTTLENECK</Badge>}
           {m.smedAlert && <Badge tone="warn">SMED</Badge>}
@@ -137,10 +137,11 @@ export function StationAnalysisView() {
 type PM = SystemMetrics['processes'][number]
 
 function RatePanel({ m }: { m: PM }) {
+  const { t } = useT()
   const rates: { label: string; value: number; formula: string }[] = [
-    { label: 'TRS (OEE)', value: m.trs, formula: 'A × P × Q — useful ÷ required time' },
-    { label: 'TRG', value: m.trg, formula: 'TRS × engagement — useful ÷ opening' },
-    { label: 'TRE', value: m.tre, formula: 'TRG × opening — useful ÷ total (24/7)' },
+    { label: 'TRS (OEE)', value: m.trs, formula: t('station.trsF') },
+    { label: 'TRG', value: m.trg, formula: t('station.trgF') },
+    { label: 'TRE', value: m.tre, formula: t('station.treF') },
   ]
   return (
     <div className="grid grid-cols-3 gap-2">
@@ -250,9 +251,7 @@ function CtWaterfall({ m, taktSeconds }: { m: PM; taktSeconds: number }) {
           </div>
         ))}
       </div>
-      <p className="text-[10px] text-slate-500">
-        Red marker = takt {fmtSeconds(taktSeconds)}. CT grand beyond it cannot meet demand.
-      </p>
+      <p className="text-[10px] text-slate-500">{t('station.waterfallNote')} ({fmtSeconds(taktSeconds)})</p>
     </Section>
   )
 }

@@ -369,7 +369,7 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
             <button className="btn-ghost !px-2 font-mono" onClick={() => setView((v) => ({ ...v, k: Math.min(4, v.k * 1.2) }))}>+</button>
             <button className="btn-ghost !px-2 font-mono" onClick={() => setView((v) => ({ ...v, k: Math.max(0.2, v.k / 1.2) }))}>−</button>
             <button className="btn-ghost !px-2 font-mono" onClick={fitView}>⊡</button>
-            <button className={`btn-ghost !px-2 ${gridOpen ? '!text-flow' : ''}`} onClick={() => setGridOpen((o) => !o)} title="Grid settings">
+            <button className={`btn-ghost !px-2 ${gridOpen ? '!text-flow' : ''}`} onClick={() => setGridOpen((o) => !o)} title={t('floor.gridSettings')}>
               <Grid3X3 size={13} />
             </button>
           </div>
@@ -477,11 +477,7 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
             <Section title={t('floor.plantScale')}>
               <NumberField label={t('floor.metersPerUnit')} unit="m" value={spaghetti.metersPerUnit} min={0.01} max={2} step={0.01}
                 onChange={(v) => useApp.getState().setMetersPerUnit(v)} />
-              <p className="text-[11px] leading-relaxed text-slate-500">
-                Draw the plant footprint with <b>Zone</b>, then trace material travel with <b>Route</b> —
-                click waypoints, double-click to commit. Line weight scales with trips per shift; every
-                meter is costed by transport mode.
-              </p>
+              <p className="text-[11px] leading-relaxed text-slate-500">{t('floor.plantHint')}</p>
             </Section>
             <FloorPlanPanel />
           </>
@@ -573,7 +569,7 @@ function FloorPlanPanel() {
       title={t('floor.underlay')}
       right={
         background ? (
-          <button className="text-slate-500 hover:text-crit transition-colors" title="Remove floor plan"
+          <button className="text-slate-500 hover:text-crit transition-colors" title={t('floor.removePlan')}
             onClick={() => useApp.getState().setFloorBackground(null)}>
             <X size={14} />
           </button>
@@ -602,10 +598,7 @@ function FloorPlanPanel() {
         <NumberField label={t('floor.opacity')} unit="%" value={Math.round(background.opacity * 100)} min={5} max={100} step={5} slider
           onChange={(v) => useApp.getState().setFloorBackground({ ...background, opacity: v / 100 })} />
       )}
-      <p className="text-[10px] leading-relaxed text-slate-500">
-        Drop a CAD export or photo of the plant floor and trace zones and routes over it.
-        The image is stored inside the project file.
-      </p>
+      <p className="text-[10px] leading-relaxed text-slate-500">{t('floor.underlayHint')}</p>
     </Section>
   )
 }

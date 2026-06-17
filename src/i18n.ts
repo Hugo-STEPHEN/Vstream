@@ -115,7 +115,7 @@ const STRINGS = {
     fr: 'Déposez des procédés et des stocks dans le couloir matière — l’échelle VA/NVA se construit seule.',
   },
   'canvas.flowSummary': { en: 'FLOW SUMMARY', fr: 'SYNTHÈSE DU FLUX' },
-  'canvas.leadTime': { en: 'Lead time', fr: 'Délai d’écoulement' },
+  'canvas.leadTime': { en: 'Lead time', fr: 'Temps de traversée' },
   'canvas.valueAdd': { en: 'Value-add', fr: 'Valeur ajoutée' },
   'canvas.nva': { en: 'Non-value-add', fr: 'Non-valeur ajoutée' },
   'canvas.bottleneck': { en: '▲ BOTTLENECK', fr: '▲ GOULOT' },
@@ -195,8 +195,8 @@ const STRINGS = {
   // Analytics
   'ana.takt': { en: 'Takt', fr: 'Takt' },
   'ana.capacity': { en: 'Capacity', fr: 'Capacité' },
-  'ana.leadTime': { en: 'Lead time', fr: 'Délai d’écoulement' },
-  'ana.fpy': { en: 'First pass yield', fr: 'Rendement premier passage' },
+  'ana.leadTime': { en: 'Lead time', fr: 'Temps de traversée' },
+  'ana.fpy': { en: 'First pass yield', fr: 'Rendement au premier passage' },
   'ana.labor': { en: 'Direct labor', fr: 'Main-d’œuvre directe' },
   'ana.transportPart': { en: 'Transport / part', fr: 'Transport / pièce' },
   'ana.limitedBy': { en: 'limited by', fr: 'limité par' },
@@ -229,8 +229,154 @@ const STRINGS = {
   'cal.bench': { en: 'Benchmark reference bands — your industry, your targets', fr: 'Bandes de référence benchmark — votre secteur, vos cibles' },
   'help.title': { en: 'Need definitions & formulas', fr: 'Définitions des besoins & formules' },
   'help.dictionary': { en: 'Data dictionary (.csv)', fr: 'Dictionnaire de données (.csv)' },
+  'help.dictionaryHint': { en: 'Download the full data dictionary as CSV', fr: 'Télécharger le dictionnaire complet en CSV' },
   'help.search': { en: 'Search a term… (takt, PCE, setup penalty)', fr: 'Rechercher un terme… (takt, PCE, pénalité)' },
   'help.shortcuts': { en: 'Keyboard shortcuts', fr: 'Raccourcis clavier' },
+  'help.noMatch': { en: 'No definition matches', fr: 'Aucune définition ne correspond à' },
+  'help.close': { en: 'Close (Esc)', fr: 'Fermer (Échap)' },
+  'help.sc.v': { en: 'Select & move tool (VSM)', fr: 'Outil sélection & déplacement (VSM)' },
+  'help.sc.del': { en: 'Delete selected node, connection, zone or route', fr: 'Supprimer le nœud, la connexion, la zone ou le trajet sélectionné' },
+  'help.sc.esc': { en: 'Cancel connection / draft, back to select', fr: 'Annuler la connexion / le tracé, retour à la sélection' },
+  'help.sc.enter': { en: 'Commit the draft route or polygon (Spaghetti)', fr: 'Valider le trajet ou le polygone en cours (Spaghetti)' },
+  'help.sc.undo': { en: 'Undo / redo', fr: 'Annuler / rétablir' },
+  'help.sc.wheel': { en: 'Zoom the sheet (cursor-centered)', fr: 'Zoomer la feuille (centré curseur)' },
+  'help.sc.pan': { en: 'Pan the sheet', fr: 'Déplacer la feuille' },
+
+  // Common
+  'common.close': { en: 'Close', fr: 'Fermer' },
+  'common.copied': { en: 'Copied', fr: 'Copié' },
+  'common.resetDefault': { en: 'Reset to default', fr: 'Réinitialiser' },
+
+  // Calibration (detail labels)
+  'cal.resetHint': { en: 'Restore every assumption to factory defaults', fr: 'Rétablir toutes les hypothèses par défaut' },
+  'cal.smedAbove': { en: 'SMED flag above', fr: 'Drapeau SMED au-delà de' },
+  'cal.smedUnit': { en: '× CT nominal', fr: '× TC nominal' },
+  'cal.scrapAt': { en: 'Scrap warning at', fr: 'Alerte rebut à' },
+  'cal.availBelow': { en: 'Availability warning below', fr: 'Alerte dispo. en dessous de' },
+  'cal.invAbove': { en: 'Inventory note above', fr: 'Note stock au-delà de' },
+  'cal.pceBelow': { en: 'Low-PCE note below', fr: 'Note PCE faible en dessous de' },
+  'cal.taktNote': {
+    en: 'The over-takt flag is structural (CT grand > takt) and cannot be tuned away.',
+    fr: 'Le drapeau « takt dépassé » est structurel (TC global > takt) et n’est pas réglable.',
+  },
+  'cal.cost': { en: 'Cost', fr: 'Coût' },
+  'cal.speed': { en: 'Speed', fr: 'Vitesse' },
+  'cal.transportNote': {
+    en: "Calibrate to your plant's loaded rates (driver wage + asset depreciation + energy per meter). Every route cost, ROI figure and transport audit re-computes instantly.",
+    fr: 'Calibrez avec vos coûts complets (salaire cariste + amortissement + énergie au mètre). Chaque coût de trajet, ROI et audit transport se recalcule instantanément.',
+  },
+  'cal.metric': { en: 'Metric', fr: 'Indicateur' },
+  'cal.typical0': { en: 'Typical (score 0)', fr: 'Typique (score 0)' },
+  'cal.worldClass100': { en: 'World class (100)', fr: 'World class (100)' },
+  'cal.benchNote': {
+    en: 'Defaults are discrete-manufacturing rules of thumb (Rother & Shook PCE bands, ~90% world-class availability). Calibrate them to your sector — process industry, food, electronics — and the radar, scores and grade follow.',
+    fr: 'Les valeurs par défaut sont des repères de fabrication discrète (bandes PCE Rother & Shook, ~90 % de dispo world-class). Calibrez-les pour votre secteur — process, agroalimentaire, électronique — et le radar, les scores et la note suivent.',
+  },
+
+  // Analytics (hints, empties, buttons, table headers, ESG)
+  'ana.openRate': { en: 'Open rate analysis (TRS / TRG / TRE)', fr: 'Ouvrir l’analyse des taux (TRS / TRG / TRE)' },
+  'ana.applyHint': { en: 'Apply this parameter change to the model', fr: 'Appliquer ce changement au modèle' },
+  'ana.loadNote': {
+    en: 'Green is honest work; everything above it is overhead from downtime, defects and changeovers. Bars crossing the red line cannot meet demand.',
+    fr: 'Le vert est le travail utile ; tout ce qui est au-dessus est du surcoût (arrêts, défauts, changements). Les barres qui franchissent la ligne rouge ne peuvent pas tenir la demande.',
+  },
+  'ana.bottleneckNote': {
+    en: 'Waste/part = CT* − nominal CT: the audited overhead each part carries through the station. Click a row to open it on the canvas.',
+    fr: 'Gaspillage/pièce = TC* − TC nominal : le surcoût audité que chaque pièce porte au poste. Cliquez une ligne pour l’ouvrir sur le canevas.',
+  },
+  'ana.copilotNote': {
+    en: 'Every impact is recomputed through the full engine — apply a countermeasure and the canvas, ladder and benchmarks update instantly. “Copy prompt” exports the grounding context for an LLM co-pilot.',
+    fr: 'Chaque impact est recalculé par le moteur complet — appliquez une contre-mesure et le canevas, l’échelle et les benchmarks se mettent à jour. « Copier le prompt » exporte le contexte pour un co-pilote LLM.',
+  },
+  'ana.transportNote': {
+    en: 'Conveyance seconds each produced part carries on floor routes linked to VSM stations (link routes in the Spaghetti inspector). Transport is pure muda — compare it to the stations’ cycle times.',
+    fr: 'Secondes de manutention que chaque pièce produite porte sur les trajets liés à un poste VSM (liez les trajets dans l’inspecteur Spaghetti). Le transport est du muda pur — comparez-le aux temps de cycle.',
+  },
+  'ana.copilotEmpty': { en: 'No high-leverage countermeasure found — this stream is already tight.', fr: 'Aucune contre-mesure à fort levier — ce flux est déjà tendu.' },
+  'ana.loadEmpty': { en: 'Add process steps on the VSM canvas to populate the audit.', fr: 'Ajoutez des procédés sur le canevas VSM pour alimenter l’audit.' },
+  'ana.auditEmpty': { en: 'No stations to audit yet.', fr: 'Aucun poste à auditer pour l’instant.' },
+  'ana.copyPrompt': { en: 'Copy prompt', fr: 'Copier le prompt' },
+  'ana.copyCurl': { en: 'Copy curl', fr: 'Copier curl' },
+  'ana.energy': { en: 'Energy', fr: 'Énergie' },
+  'ana.scrap': { en: 'Scrap', fr: 'Rebut' },
+  'ana.scrapMass': { en: 'Scrap mass', fr: 'Masse rebut' },
+  'ana.saveHint': { en: 'Freeze the current stations, connections and demand as a named scenario', fr: 'Figer postes, connexions et demande actuels comme scénario nommé' },
+  'ana.applyScenarioHint': { en: 'Apply this scenario to the canvas (undoable)', fr: 'Appliquer ce scénario au canevas (annulable)' },
+  'ana.deleteScenario': { en: 'Delete scenario', fr: 'Supprimer le scénario' },
+  'ana.noScenarios': {
+    en: 'No scenarios yet. Save the current model as a baseline, then change parameters on the canvas (or apply kaizen suggestions) and save again — every saved state is compared here side by side.',
+    fr: 'Aucun scénario. Enregistrez le modèle actuel comme référence, puis modifiez des paramètres (ou appliquez des suggestions kaizen) et enregistrez à nouveau — chaque état est comparé ici côte à côte.',
+  },
+  'ana.scenarioNote': {
+    en: 'Deltas are measured against the live model. Scenarios freeze stations, connections and demand — they are saved with the project file and survive export/import.',
+    fr: 'Les écarts sont mesurés vs le modèle en direct. Les scénarios figent postes, connexions et demande — ils sont sauvegardés avec le projet et survivent à l’export/import.',
+  },
+  'ana.sweepEmpty': { en: 'Add process steps on the VSM canvas to sweep parameters.', fr: 'Ajoutez des procédés sur le canevas VSM pour balayer les paramètres.' },
+  'ana.sweepNote': {
+    en: '25 honest re-simulations of the whole stream — no interpolation. The dashed marker is the current value; everything else on the model is held constant.',
+    fr: '25 re-simulations honnêtes de tout le flux — sans interpolation. Le repère en pointillé est la valeur actuelle ; tout le reste du modèle est maintenu constant.',
+  },
+  'ana.sensitivityShort': { en: 'Sensitivity explorer', fr: 'Explorateur de sensibilité' },
+  'ana.thStation': { en: 'Station', fr: 'Poste' },
+  'ana.thLoad': { en: 'Load', fr: 'Charge' },
+  'ana.thWaste': { en: 'Waste/part', fr: 'Gaspil./pièce' },
+  'ana.thFlags': { en: 'Flags', fr: 'Drapeaux' },
+  'ana.thRouteStation': { en: 'Route → station', fr: 'Trajet → poste' },
+  'ana.thTimePart': { en: 'Time/part', fr: 'Temps/pièce' },
+  'ana.thScenario': { en: 'Scenario', fr: 'Scénario' },
+  'ana.thLeadTime': { en: 'Lead time', fr: 'Délai' },
+  'ana.thCapacity': { en: 'Capacity', fr: 'Capacité' },
+  'ana.thGrade': { en: 'Grade', fr: 'Note' },
+  'ana.connectorsBody1': {
+    en: 'Edge IoT devices, barcode scanners and MES databases can pipe measured cycle times straight into this model via',
+    fr: 'Capteurs IoT, scanners code-barres et bases MES peuvent injecter les temps de cycle mesurés directement dans ce modèle via',
+  },
+  'ana.connectorsBody2': {
+    en: 'The typed payload contract ships with the app',
+    fr: 'Le contrat de charge typé est fourni avec l’application',
+  },
+
+  // Benchmarks
+  'bench.gradeDesc': {
+    en: 'Composite of six lean KPIs scored against typical batch-and-queue plants (0) and world-class lean references (100).',
+    fr: 'Composite de six KPI lean notés vs usines lot-et-file typiques (0) et références lean world-class (100).',
+  },
+  'bench.worldClass': { en: 'World class', fr: 'World class' },
+  'bench.currentPlant': { en: 'Current plant', fr: 'Usine actuelle' },
+  'bench.thMetric': { en: 'Metric', fr: 'Indicateur' },
+  'bench.thCurrent': { en: 'Current', fr: 'Actuel' },
+  'bench.thTypical': { en: 'Typical', fr: 'Typique' },
+  'bench.thWorldClass': { en: 'World class', fr: 'World class' },
+  'bench.thPosition': { en: 'Position', fr: 'Position' },
+  'bench.note': {
+    en: 'References are established lean rules of thumb (Rother & Shook PCE bands, ~85% world-class OEE, SMED < 5% setup share) — orientation values to steer kaizen priorities, not certified statistics.',
+    fr: 'Les références sont des repères lean établis (bandes PCE Rother & Shook, ~85 % d’OEE world-class, SMED < 5 % de part de changement) — valeurs d’orientation pour prioriser le kaizen, pas des statistiques certifiées.',
+  },
+
+  // Spaghetti leftovers
+  'floor.removePlan': { en: 'Remove floor plan', fr: 'Retirer le plan' },
+  'floor.gridSettings': { en: 'Grid settings', fr: 'Réglages de la grille' },
+  'floor.plantHint': {
+    en: 'Draw the plant footprint with Zone (or Poly for non-rectangular), then trace material travel with Route — click waypoints, double-click to commit. Line weight scales with trips per shift; every meter is costed by transport mode.',
+    fr: 'Tracez l’emprise avec Zone (ou Poly pour le non-rectangulaire), puis le flux matière avec Trajet — cliquez les étapes, double-clic pour valider. L’épaisseur du trait suit les trajets par équipe ; chaque mètre est costé selon le mode de transport.',
+  },
+  'floor.underlayHint': {
+    en: 'Drop a CAD export or photo of the plant floor and trace zones and routes over it. The image is stored inside the project file.',
+    fr: 'Déposez un export CAO ou une photo du sol et tracez zones et trajets par-dessus. L’image est stockée dans le fichier projet.',
+  },
+
+  // Station analysis
+  'station.header': { en: 'rate analysis', fr: 'analyse des taux' },
+  'station.waterfallNote': {
+    en: 'Red marker = takt. CT grand beyond it cannot meet demand.',
+    fr: 'Repère rouge = takt. Un TC global au-delà ne peut pas tenir la demande.',
+  },
+  'station.trsF': { en: 'A × P × Q — useful ÷ required time', fr: 'A × P × Q — temps utile ÷ requis' },
+  'station.trgF': { en: 'TRS × engagement — useful ÷ opening', fr: 'TRS × engagement — utile ÷ ouverture' },
+  'station.treF': { en: 'TRG × opening — useful ÷ total (24/7)', fr: 'TRG × ouverture — utile ÷ total (24/7)' },
+
+  // Inspector
+  'insp.resetColor': { en: 'Reset to default', fr: 'Réinitialiser' },
 } as const
 
 export type StringKey = keyof typeof STRINGS

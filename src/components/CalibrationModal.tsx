@@ -2,18 +2,10 @@ import { RotateCcw, SlidersHorizontal, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useApp } from '../store'
 import { DEFAULT_CALIBRATION, transportProfiles } from '../lib/calibration'
+import { BENCHMARK_META } from '../lib/benchmarks'
 import { NumberField, TextField } from './ui'
 import { useT } from '../i18n'
 import type { BenchmarkKey, CalibrationConfig, TransportMode } from '../types'
-
-const BENCHMARK_LABELS: Record<BenchmarkKey, { label: string; unit: string }> = {
-  pce: { label: 'Process cycle efficiency', unit: '%' },
-  availability: { label: 'Average availability (OEE-A)', unit: '%' },
-  fpy: { label: 'First pass yield', unit: '%' },
-  inventory: { label: 'Inventory coverage', unit: 'days' },
-  setup: { label: 'Setup share of processing', unit: '%' },
-  capacity: { label: 'Capacity vs demand', unit: '%' },
-}
 
 /**
  * Every model assumption in one place: alert thresholds, transport economics,
@@ -21,7 +13,7 @@ const BENCHMARK_LABELS: Record<BenchmarkKey, { label: string; unit: string }> = 
  * applied through every engine, undoable like any other edit.
  */
 export function CalibrationModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { t } = useT()
+  const { lang, t } = useT()
   const cal = useApp((s) => s.calibration)
   const setCalibration = useApp((s) => s.setCalibration)
 
@@ -48,11 +40,11 @@ export function CalibrationModal({ open, onClose }: { open: boolean; onClose: ()
               <button
                 className="btn-ghost ml-auto flex items-center gap-1.5"
                 onClick={() => useApp.getState().resetCalibration()}
-                title="Restore every assumption to factory defaults"
+                title={t('cal.resetHint')}
               >
                 <RotateCcw size={12} /> {t('cal.reset')}
               </button>
-              <button className="rounded-md p-1.5 text-slate-400 hover:text-white transition-colors" onClick={onClose} title="Close">
+              <button className="rounded-md p-1.5 text-slate-400 hover:text-white transition-colors" onClick={onClose} title={t('common.close')}>
                 <X size={16} />
               </button>
             </header>
@@ -84,19 +76,19 @@ export function CalibrationModal({ open, onClose }: { open: boolean; onClose: ()
               <section>
                 <h3 className="field-label pb-2">{t('cal.alerts')}</h3>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  <NumberField label="SMED flag above" unit="× CT nominal" value={cal.alerts.smedFactor} min={0.05} max={2} step={0.05}
+                  <NumberField label={t('cal.smedAbove')} unit={t('cal.smedUnit')} value={cal.alerts.smedFactor} min={0.05} max={2} step={0.05}
                     onChange={(smedFactor) => patch({ alerts: { ...cal.alerts, smedFactor } })} />
-                  <NumberField label="Scrap warning at" unit="%" value={Math.round(cal.alerts.scrapWarn * 100)} min={1} max={50} step={1}
+                  <NumberField label={t('cal.scrapAt')} unit="%" value={Math.round(cal.alerts.scrapWarn * 100)} min={1} max={50} step={1}
                     onChange={(v) => patch({ alerts: { ...cal.alerts, scrapWarn: v / 100 } })} />
-                  <NumberField label="Availability warning below" unit="%" value={Math.round(cal.alerts.availabilityWarn * 100)} min={10} max={100} step={1}
+                  <NumberField label={t('cal.availBelow')} unit="%" value={Math.round(cal.alerts.availabilityWarn * 100)} min={10} max={100} step={1}
                     onChange={(v) => patch({ alerts: { ...cal.alerts, availabilityWarn: v / 100 } })} />
-                  <NumberField label="Inventory note above" unit="days" value={cal.alerts.inventoryDaysWarn} min={0.5} max={60} step={0.5}
+                  <NumberField label={t('cal.invAbove')} unit={lang === 'fr' ? 'jours' : 'days'} value={cal.alerts.inventoryDaysWarn} min={0.5} max={60} step={0.5}
                     onChange={(inventoryDaysWarn) => patch({ alerts: { ...cal.alerts, inventoryDaysWarn } })} />
-                  <NumberField label="Low-PCE note below" unit="%" value={cal.alerts.pceLowPct} min={1} max={30} step={0.5}
+                  <NumberField label={t('cal.pceBelow')} unit="%" value={cal.alerts.pceLowPct} min={1} max={30} step={0.5}
                     onChange={(pceLowPct) => patch({ alerts: { ...cal.alerts, pceLowPct } })} />
                 </div>
                 <p className="pt-1 text-[10px] text-slate-500">
-                  The over-takt flag is structural (CT grand &gt; takt) and cannot be tuned away.
+                  {t('cal.taktNote')}
                 </p>
               </section>
 
@@ -109,20 +101,17 @@ export function CalibrationModal({ open, onClose }: { open: boolean; onClose: ()
                     return (
                       <div key={m} className="grid grid-cols-[120px_1fr_1fr] items-end gap-2 rounded-md border border-edge bg-ink p-2">
                         <span className="pb-1.5 text-xs" style={{ color: display.color }}>● {display.label}</span>
-                        <NumberField label="Cost" unit={`${cal.currency}/m`} value={cal.transport[m].costPerMeter} min={0} max={20} step={0.05}
+                        <NumberField label={t('cal.cost')} unit={`${cal.currency}/m`} value={cal.transport[m].costPerMeter} min={0} max={20} step={0.05}
                           onChange={(costPerMeter) =>
                             patch({ transport: { ...cal.transport, [m]: { ...cal.transport[m], costPerMeter } } })} />
-                        <NumberField label="Speed" unit="m/s" value={cal.transport[m].speedMps} min={0.1} max={15} step={0.1}
+                        <NumberField label={t('cal.speed')} unit="m/s" value={cal.transport[m].speedMps} min={0.1} max={15} step={0.1}
                           onChange={(speedMps) =>
                             patch({ transport: { ...cal.transport, [m]: { ...cal.transport[m], speedMps } } })} />
                       </div>
                     )
                   })}
                 </div>
-                <p className="pt-1 text-[10px] text-slate-500">
-                  Calibrate to your plant's loaded rates (driver wage + asset depreciation + energy per meter).
-                  Every route cost, ROI figure and transport audit re-computes instantly.
-                </p>
+                <p className="pt-1 text-[10px] text-slate-500">{t('cal.transportNote')}</p>
               </section>
 
               {/* Benchmark references */}
@@ -130,13 +119,13 @@ export function CalibrationModal({ open, onClose }: { open: boolean; onClose: ()
                 <h3 className="field-label pb-2">{t('cal.bench')}</h3>
                 <div className="overflow-hidden rounded-lg border border-edge">
                   <div className="grid grid-cols-[1fr_110px_110px] gap-2 border-b border-edge bg-ink px-3 py-1.5 text-[10px] uppercase tracking-wider text-slate-500">
-                    <span>Metric</span><span>Typical (score 0)</span><span>World class (100)</span>
+                    <span>{t('cal.metric')}</span><span>{t('cal.typical0')}</span><span>{t('cal.worldClass100')}</span>
                   </div>
-                  {(Object.keys(BENCHMARK_LABELS) as BenchmarkKey[]).map((k) => (
+                  {(Object.keys(BENCHMARK_META) as BenchmarkKey[]).map((k) => (
                     <div key={k} className="grid grid-cols-[1fr_110px_110px] items-center gap-2 border-b border-edge/60 px-3 py-1.5 last:border-b-0">
                       <span className="text-[11px] text-slate-300">
-                        {BENCHMARK_LABELS[k].label}
-                        <span className="ml-1 font-mono text-[9px] text-slate-500">{BENCHMARK_LABELS[k].unit}</span>
+                        {BENCHMARK_META[k].name[lang]}
+                        <span className="ml-1 font-mono text-[9px] text-slate-500">{BENCHMARK_META[k].unit[lang]}</span>
                       </span>
                       {(['typical', 'worldClass'] as const).map((side) => (
                         <input
@@ -157,10 +146,8 @@ export function CalibrationModal({ open, onClose }: { open: boolean; onClose: ()
                   ))}
                 </div>
                 <p className="pt-1 text-[10px] text-slate-500">
-                  Defaults are discrete-manufacturing rules of thumb (Rother &amp; Shook PCE bands, ~90% world-class
-                  availability). Calibrate them to your sector — process industry, food, electronics — and the
-                  radar, scores and grade follow. Factory defaults: PCE {DEFAULT_CALIBRATION.benchmarks.pce.typical}→
-                  {DEFAULT_CALIBRATION.benchmarks.pce.worldClass}%.
+                  {t('cal.benchNote')}{' '}
+                  <span className="font-mono">PCE {DEFAULT_CALIBRATION.benchmarks.pce.typical}→{DEFAULT_CALIBRATION.benchmarks.pce.worldClass}%.</span>
                 </p>
               </section>
             </div>

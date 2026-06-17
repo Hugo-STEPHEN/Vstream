@@ -52,7 +52,7 @@ export function Inspector() {
                   onClick={() => updateNode(node.id, { color: c })} />
               ))}
               {node.color && (
-                <button className="btn-ghost !px-1.5 !py-0.5 text-[10px]" title="Reset to default"
+                <button className="btn-ghost !px-1.5 !py-0.5 text-[10px]" title={t('insp.resetColor')}
                   onClick={() => updateNode(node.id, { color: undefined })}>
                   auto
                 </button>

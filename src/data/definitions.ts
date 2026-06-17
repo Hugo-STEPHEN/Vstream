@@ -223,7 +223,7 @@ export const DEFINITIONS: NeedDefinition[] = [
   {
     category: 'System flow',
     term: 'Lead time (PLT)',
-    termFr: 'Délai d’écoulement (PLT)',
+    termFr: 'Temps de traversée (PLT)',
     definitionFr: "Délai total de traversée : transit d'une pièce porte à porte, procédés et files comprises.",
     formula: 'Σ CT_grand + Σ NVA dwell',
     unit: 's (shown in working days)',
@@ -260,7 +260,7 @@ export const DEFINITIONS: NeedDefinition[] = [
   {
     category: 'System flow',
     term: 'First pass yield (FPY)',
-    termFr: 'Rendement premier passage (FPY)',
+    termFr: 'Rendement au premier passage (FPY)',
     definitionFr: "Probabilité qu'une pièce traverse tous les postes sans retouche ni rebut.",
     formula: 'Π (1 − SR) across stations',
     unit: '%',

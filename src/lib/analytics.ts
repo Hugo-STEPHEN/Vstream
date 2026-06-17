@@ -275,7 +275,7 @@ function buildAlerts(
           ? `${inv.label} : ${inv.days.toFixed(1)} jours de stock`
           : `${inv.label}: ${inv.days.toFixed(1)} days of inventory`,
         detail: fr
-          ? `${inv.qty.toLocaleString()} pièces en attente — un moteur majeur du délai d'écoulement. Envisagez un supermarché dimensionné en tiré.`
+          ? `${inv.qty.toLocaleString()} pièces en attente — un moteur majeur du temps de traversée. Envisagez un supermarché dimensionné en tiré.`
           : `${inv.qty.toLocaleString()} parts queued — a leading driver of the lead time. Consider a supermarket with pull sizing.`,
       })
     }
