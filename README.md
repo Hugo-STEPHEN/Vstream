@@ -11,9 +11,15 @@ suggestions and the benchmark grade.
 
 ## Quick start
 
+**Windows — one click:** install [Node.js LTS](https://nodejs.org), then
+double-click **`start.bat`**. It installs dependencies on first run and opens the
+app in your browser. Use **`update.bat`** to pull later versions.
+
+**Any OS — terminal:**
+
 ```bash
 npm install
-npm run dev       # development server on :5173
+npm run dev       # development server on :5173 (add -- --open to launch the browser)
 npm run build     # production bundle in dist/
 npm test          # analytics engine test suite (vitest)
 ```
