@@ -78,6 +78,10 @@ export interface AppState {
   spaghetti: VsmProject['spaghetti']
   scenarios: Scenario[]
   calibration: CalibrationConfig
+  /** The scenario currently loaded in the working view (null = unsaved model). */
+  activeScenarioId: string | null
+  /** Snapshot of the working model stashed when first entering a scenario. */
+  liveBackup: { nodes: VsmNode[]; edges: VsmEdge[]; demand: DemandConfig } | null
   // ui
   tab: AppTab
   tool: VsmTool
@@ -136,6 +140,8 @@ export interface AppState {
   // scenarios
   saveScenario: (name: string) => void
   applyScenario: (id: string) => void
+  /** Rapidly navigate the whole app to a scenario (null = working model). */
+  switchScenario: (id: string | null) => void
   deleteScenario: (id: string) => void
   renameScenario: (id: string, name: string) => void
   // calibration
@@ -162,9 +168,19 @@ function takeHistory(s: AppState): HistoryShape {
   })
 }
 
-/** Wrap a mutation so it records undo history (capped at 60 entries). */
+/**
+ * Wrap a mutation so it records undo history (capped at 60 entries). Any tracked
+ * edit detaches the working view from a loaded scenario, so the scenario switcher
+ * shows "(working model)" again and the stashed backup is dropped.
+ */
 function withHistory(s: AppState, patch: Partial<AppState>): Partial<AppState> {
-  return { ...patch, past: [...s.past.slice(-59), takeHistory(s)], future: [] }
+  return {
+    activeScenarioId: null,
+    liveBackup: null,
+    ...patch,
+    past: [...s.past.slice(-59), takeHistory(s)],
+    future: [],
+  }
 }
 
 function initialProject(): VsmProject {
@@ -191,6 +207,8 @@ export const useApp = create<AppState>((set, get) => ({
   demand: init.demand,
   spaghetti: init.spaghetti,
   scenarios: init.scenarios ?? [],
+  activeScenarioId: null,
+  liveBackup: null,
   calibration: mergeCalibration(init.calibration),
   tab: 'vsm',
   tool: 'select',
@@ -411,31 +429,51 @@ export const useApp = create<AppState>((set, get) => ({
 
   // --- scenarios ---
   saveScenario: (name) =>
-    set((s) => ({
-      scenarios: [
-        ...s.scenarios,
-        {
-          id: nextId('sc'),
-          name,
-          savedAt: new Date().toISOString(),
-          nodes: structuredClone(s.nodes),
-          edges: structuredClone(s.edges),
-          demand: structuredClone(s.demand),
-        },
-      ],
-    })),
-  applyScenario: (id) =>
     set((s) => {
-      const sc = s.scenarios.find((x) => x.id === id)
-      if (!sc) return {}
-      return withHistory(s, {
-        nodes: structuredClone(sc.nodes),
-        edges: structuredClone(sc.edges),
-        demand: structuredClone(sc.demand),
+      const id = nextId('sc')
+      return {
+        scenarios: [
+          ...s.scenarios,
+          {
+            id,
+            name,
+            savedAt: new Date().toISOString(),
+            nodes: structuredClone(s.nodes),
+            edges: structuredClone(s.edges),
+            demand: structuredClone(s.demand),
+          },
+        ],
+        // The model just saved becomes the active scenario.
+        activeScenarioId: id,
+      }
+    }),
+  applyScenario: (id) => get().switchScenario(id),
+  switchScenario: (id) =>
+    set((s) => {
+      if (id === s.activeScenarioId) return {}
+      // Stash the working model the first time we leave it, so "(working model)"
+      // and any later switch back restores exactly what the user had.
+      const liveBackup =
+        s.activeScenarioId === null
+          ? structuredClone({ nodes: s.nodes, edges: s.edges, demand: s.demand })
+          : s.liveBackup
+      const target =
+        id === null
+          ? liveBackup ?? { nodes: s.nodes, edges: s.edges, demand: s.demand }
+          : s.scenarios.find((x) => x.id === id)
+      if (!target) return {}
+      return {
+        nodes: structuredClone(target.nodes),
+        edges: structuredClone(target.edges),
+        demand: structuredClone(target.demand),
+        activeScenarioId: id,
+        liveBackup: id === null ? null : liveBackup,
+        past: [...s.past.slice(-59), takeHistory(s)],
+        future: [],
         selectedNodeId: null,
         selectedEdgeId: null,
         connectFrom: null,
-      })
+      }
     }),
   deleteScenario: (id) => set((s) => ({ scenarios: s.scenarios.filter((x) => x.id !== id) })),
   renameScenario: (id, name) =>

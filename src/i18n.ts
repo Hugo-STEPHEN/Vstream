@@ -30,6 +30,8 @@ const STRINGS = {
   'topbar.help': { en: 'Need definitions & formulas', fr: 'Définitions des besoins & formules' },
   'topbar.language': { en: 'Switch language / Changer de langue', fr: 'Changer de langue / Switch language' },
   'topbar.export': { en: 'Export', fr: 'Exporter' },
+  'topbar.workingModel': { en: '● Working model', fr: '● Modèle de travail' },
+  'topbar.scenarioPick': { en: 'Switch the whole app to a scenario', fr: 'Basculer toute l’appli sur un scénario' },
   'confirm.new': {
     en: 'Start a blank project? Current work stays in your last export.',
     fr: 'Démarrer un projet vierge ? Le travail en cours reste dans votre dernier export.',

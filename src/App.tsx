@@ -186,6 +186,8 @@ function TopBar({
         title="Project name"
       />
 
+      <ScenarioSwitcher />
+
       {/* Tabs */}
       <nav className="ml-2 flex rounded-lg border border-edge p-0.5">
         {TABS.map((tabDef) => {
@@ -294,6 +296,28 @@ function TopBar({
         </div>
       </div>
     </header>
+  )
+}
+
+/** Top-bar pull-down to flip the whole app between the working model and saved scenarios. */
+function ScenarioSwitcher() {
+  const { t } = useT()
+  const scenarios = useApp((s) => s.scenarios)
+  const activeScenarioId = useApp((s) => s.activeScenarioId)
+  if (scenarios.length === 0) return null
+  return (
+    <select
+      className="ml-2 max-w-[180px] rounded-md border border-edge bg-ink px-2 py-1.5 font-display text-xs text-slate-300
+        hover:border-steel focus:border-flow/60 focus:outline-none transition-colors"
+      title={t('topbar.scenarioPick')}
+      value={activeScenarioId ?? ''}
+      onChange={(e) => useApp.getState().switchScenario(e.target.value || null)}
+    >
+      <option value="">{t('topbar.workingModel')}</option>
+      {scenarios.map((sc) => (
+        <option key={sc.id} value={sc.id}>◆ {sc.name}</option>
+      ))}
+    </select>
   )
 }
 
