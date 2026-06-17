@@ -1,0 +1,47 @@
+# 04 — Studio Spaghetti
+
+Le **diagramme spaghetti** trace les déplacements physiques (de l'opérateur, du
+chariot, de l'AGV) sur le plan de l'usine. Plus les lignes s'emmêlent, plus il y a
+de gaspillage de transport.
+
+## Construire le plan
+
+1. **Image de fond** (optionnel) — chargez un export CAO ou une photo du sol via
+   le panneau de droite, et tracez par-dessus. L'image est stockée dans le projet.
+2. **Zones** — délimitez machines, stockages, allées. Outil **Zone** (rectangle)
+   ou **Poly** (polygone, pour les formes non rectangulaires : cliquez les
+   sommets, double-clic ou `Entrée` pour fermer). Les sommets d'un polygone se
+   re-glissent ensuite.
+3. **Trajets** — outil **Trajet** : cliquez les étapes, double-clic pour terminer.
+   Sélectionnez un trajet pour re-glisser ses points.
+
+## Modes de transport
+
+Chaque trajet a un mode, dont le **coût/m** et la **vitesse** sont réglables dans
+la calibration :
+
+| Mode | Coût par défaut | Vitesse |
+|---|---|---|
+| Marche | 0,15 $/m | 1,2 m/s |
+| Chariot | 1,20 $/m | 3,0 m/s |
+| AGV | 0,40 $/m | 1,7 m/s |
+
+## Économie
+
+En bas : distance, temps et coût par équipe et par an, plus un **ROI meilleur
+mode** (économie si chaque trajet utilisait son mode le moins cher). L'épaisseur
+du trait suit le nombre d'allers-retours.
+
+## Lien avec le VSM
+
+Sélectionnez un trajet et choisissez le **poste VSM qu'il alimente**. Le trajet
+apparaît alors dans l'**audit transport** (onglet Analyse des flux) en
+**secondes et coût par pièce produite** — directement comparable au temps de
+cycle du poste. Le transport est du muda pur : ce pont rend ce gaspillage visible
+à côté de la production.
+
+## En cours d'évolution
+
+L'étalonnage de l'échelle « au trait » (tracer une ligne de longueur connue) et
+l'impact des circuits opérateur sur le temps disponible sont des chantiers
+prévus — voir la feuille de route dans le README.

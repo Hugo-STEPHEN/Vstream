@@ -9,6 +9,13 @@ slider, an OEE percentage, a batch size — re-runs the entire mathematical engi
 instantly updates the canvas, the VA/NVA timeline ladder, the alerts, the kaizen
 suggestions and the benchmark grade.
 
+## 📚 Documentation
+
+Full guides live in **[`docs/`](docs/README.md)** (bilingual-friendly), including a
+beginner's walkthrough of the **[Rate Analysis / TRS·TRG·TRE](docs/03-rate-analysis.md)**,
+a **[VSM guide](docs/02-vsm-guide.md)**, an **[architecture overview](docs/08-architecture.md)**
+for developers, and a **[FR/EN glossary](docs/09-glossary.md)** of every acronym.
+
 ## Quick start
 
 **Windows — one click:** install [Node.js LTS](https://nodejs.org), then
