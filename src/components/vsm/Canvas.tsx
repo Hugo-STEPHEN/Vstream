@@ -7,6 +7,7 @@ import { Grid3X3 } from 'lucide-react'
 import { NumberField } from '../ui'
 import { NodeGlyph } from './NodeGlyph'
 import { useT } from '../../i18n'
+import { isAnnotationKind } from '../../types'
 import type { NodeKind, SystemMetrics, VsmEdge, VsmNode } from '../../types'
 
 const MONO = 'JetBrains Mono, monospace'
@@ -185,17 +186,26 @@ export function VsmCanvas({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }
             />
           ) : null}
 
-          {nodes.map((node) => (
-            <NodeShape
-              key={node.id}
-              node={node}
-              metrics={metrics}
-              selected={node.id === selectedNodeId}
-              connecting={tool === 'connect'}
-              isConnectSource={node.id === connectFrom}
-              onPointerDown={onPointerDownNode}
-            />
-          ))}
+          {nodes.map((node) =>
+            isAnnotationKind(node.kind) ? (
+              <AnnotationShape
+                key={node.id}
+                node={node}
+                selected={node.id === selectedNodeId}
+                onPointerDown={onPointerDownNode}
+              />
+            ) : (
+              <NodeShape
+                key={node.id}
+                node={node}
+                metrics={metrics}
+                selected={node.id === selectedNodeId}
+                connecting={tool === 'connect'}
+                isConnectSource={node.id === connectFrom}
+                onPointerDown={onPointerDownNode}
+              />
+            ),
+          )}
 
           <TimelineLadder metrics={metrics} />
         </g>
@@ -444,6 +454,128 @@ function NodeShape({
           {t('canvas.overTakt')}
         </text>
       ) : null}
+    </g>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Annotations (post-it, kaizen burst, custom block) — float freely, no metrics
+// ---------------------------------------------------------------------------
+
+/** Wrap text into lines of at most `max` chars (word-aware). */
+function wrapText(text: string, max: number): string[] {
+  const out: string[] = []
+  for (const para of text.split('\n')) {
+    let line = ''
+    for (const word of para.split(/\s+/)) {
+      if (!line) line = word
+      else if ((line + ' ' + word).length <= max) line += ' ' + word
+      else {
+        out.push(line)
+        line = word
+      }
+    }
+    out.push(line)
+  }
+  return out.slice(0, 8)
+}
+
+/** Star-burst polygon points for a kaizen burst. */
+function burstPoints(w: number, h: number, spikes = 12): string {
+  const cx = 0
+  const cy = 0
+  const rOuterX = w / 2
+  const rOuterY = h / 2
+  const pts: string[] = []
+  for (let i = 0; i < spikes * 2; i++) {
+    const outer = i % 2 === 0
+    const a = (Math.PI / spikes) * i - Math.PI / 2
+    const rx = outer ? rOuterX : rOuterX * 0.78
+    const ry = outer ? rOuterY : rOuterY * 0.78
+    pts.push(`${(Math.cos(a) * rx).toFixed(1)},${(Math.sin(a) * ry).toFixed(1)}`)
+  }
+  return pts.join(' ')
+}
+
+function AnnotationShape({
+  node,
+  selected,
+  onPointerDown,
+}: {
+  node: VsmNode
+  selected: boolean
+  onPointerDown: (e: React.PointerEvent, node: VsmNode) => void
+}) {
+  const w = node.w ?? 150
+  const h = node.h ?? 110
+  const color = node.color ?? '#FBBF24'
+  const text = node.note ?? ''
+  const openDetail = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    useApp.getState().selectNode(node.id)
+  }
+
+  return (
+    <g
+      transform={`translate(${node.x} ${node.y})`}
+      onPointerDown={(e) => onPointerDown(e, node)}
+      onDoubleClick={openDetail}
+      className="cursor-grab"
+    >
+      {selected && (
+        <rect x={-w / 2 - 6} y={-h / 2 - 6} width={w + 12} height={h + 12} rx={8}
+          fill="none" stroke="#22D3EE" strokeWidth={1.2} strokeDasharray="4 3" opacity={0.9} />
+      )}
+
+      {node.kind === 'kaizen' ? (
+        <>
+          <polygon points={burstPoints(w, h)} fill={color} fillOpacity={0.16} stroke={color} strokeWidth={2} strokeLinejoin="round" />
+          <text x={0} y={-h / 2 + 18} textAnchor="middle" fill={color} fontFamily={DISPLAY} fontSize={12} fontWeight={700}>
+            ✦ {node.label}
+          </text>
+          {wrapText(text, Math.floor(w / 7)).map((line, i) => (
+            <text key={i} x={0} y={-2 + i * 12} textAnchor="middle" fill="#E2E8F0" fontFamily={UI_FONT} fontSize={9.5}>
+              {line}
+            </text>
+          ))}
+        </>
+      ) : node.kind === 'postit' ? (
+        <>
+          {/* sticky body + folded corner */}
+          <path
+            d={`M ${-w / 2} ${-h / 2} H ${w / 2} V ${h / 2 - 16} L ${w / 2 - 16} ${h / 2} H ${-w / 2} Z`}
+            fill={color} fillOpacity={0.92} stroke={color} strokeWidth={1} />
+          <path d={`M ${w / 2} ${h / 2 - 16} L ${w / 2 - 16} ${h / 2 - 16} L ${w / 2 - 16} ${h / 2} Z`}
+            fill="#0B0F19" fillOpacity={0.25} />
+          <text x={-w / 2 + 10} y={-h / 2 + 18} fill="#1f2937" fontFamily={DISPLAY} fontSize={11.5} fontWeight={700}>
+            {node.label}
+          </text>
+          {wrapText(text, Math.floor(w / 6)).map((line, i) => (
+            <text key={i} x={-w / 2 + 10} y={-h / 2 + 36 + i * 13} fill="#1f2937" fontFamily={UI_FONT} fontSize={10}>
+              {line}
+            </text>
+          ))}
+        </>
+      ) : (
+        <>
+          {/* custom block: image or labelled box */}
+          <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={8}
+            fill="#0B0F19" stroke={color} strokeWidth={1.5} />
+          {node.image ? (
+            <image href={node.image} x={-w / 2 + 4} y={-h / 2 + 4} width={w - 8} height={h - 24}
+              preserveAspectRatio="xMidYMid meet" />
+          ) : (
+            <text x={0} y={4} textAnchor="middle" fill={color} fontFamily={DISPLAY} fontSize={13} fontWeight={600}>
+              {node.label}
+            </text>
+          )}
+          {node.image && (
+            <text x={0} y={h / 2 - 7} textAnchor="middle" fill="#94A3B8" fontFamily={UI_FONT} fontSize={10}>
+              {node.label}
+            </text>
+          )}
+        </>
+      )}
     </g>
   )
 }

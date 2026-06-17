@@ -35,6 +35,17 @@ export type NodeKind =
   | 'erp'
   | 'schedule'
   | 'goSee'
+  // Annotations (free-floating, excluded from the math)
+  | 'postit'
+  | 'kaizen'
+  | 'custom'
+
+/** Annotation kinds float freely (not clamped to a lane) and carry no metrics. */
+export const ANNOTATION_KINDS = ['postit', 'kaizen', 'custom'] as const
+export type AnnotationKind = (typeof ANNOTATION_KINDS)[number]
+export function isAnnotationKind(k: NodeKind): k is AnnotationKind {
+  return (ANNOTATION_KINDS as readonly string[]).includes(k)
+}
 
 export type EdgeKind = 'push' | 'pull' | 'manualInfo' | 'electronicInfo'
 
@@ -74,7 +85,13 @@ export interface VsmNode {
   tripsPerWeek?: number
   /** Logistics: route distance in km. */
   distanceKm?: number
+  /** Free text for post-it / kaizen / custom annotation blocks. */
   note?: string
+  /** Data-URL image for a custom block (optional). */
+  image?: string
+  /** Explicit size override for annotation blocks (canvas units). */
+  w?: number
+  h?: number
 }
 
 export interface VsmEdge {

@@ -1,9 +1,11 @@
+import { useRef } from 'react'
 import { useMemo } from 'react'
-import { AlertTriangle, Gauge, Info, Link2, Microscope, OctagonAlert, Trash2 } from 'lucide-react'
+import { AlertTriangle, Gauge, ImagePlus, Info, Link2, Microscope, OctagonAlert, Trash2, X } from 'lucide-react'
 import { useApp } from '../../store'
 import { computeProcessMetrics, computeSystemMetrics, fmtSeconds, isInventoryKind, isProcessKind } from '../../lib/analytics'
 import { Badge, NumberField, Section, TextField } from '../ui'
 import { useT, type StringKey } from '../../i18n'
+import { isAnnotationKind } from '../../types'
 import type { Alert, EdgeKind } from '../../types'
 
 const EDGE_LABEL: Record<EdgeKind, StringKey> = {
@@ -59,6 +61,8 @@ export function Inspector() {
               )}
             </div>
           </div>
+
+          {isAnnotationKind(node.kind) && <AnnotationFields nodeId={node.id} />}
 
           {isProcessKind(node.kind) && (
             <>
@@ -198,6 +202,63 @@ export function Inspector() {
         )}
       </Section>
     </aside>
+  )
+}
+
+/** Editor for post-it / kaizen / custom annotation blocks. */
+function AnnotationFields({ nodeId }: { nodeId: string }) {
+  const { t } = useT()
+  const node = useApp((s) => s.nodes.find((n) => n.id === nodeId))
+  const updateNode = useApp((s) => s.updateNode)
+  const fileRef = useRef<HTMLInputElement>(null)
+  if (!node) return null
+  return (
+    <>
+      <label className="block space-y-1">
+        <span className="field-label">{t('insp.annotText')}</span>
+        <textarea
+          rows={4}
+          className="w-full resize-y rounded-md border border-edge bg-ink px-2 py-1.5 text-xs text-slate-100
+            focus:border-flow/70 focus:outline-none transition-colors"
+          value={node.note ?? ''}
+          onChange={(e) => updateNode(node.id, { note: e.target.value })}
+        />
+      </label>
+      <div className="grid grid-cols-2 gap-2">
+        <NumberField label={t('floor.width')} unit="u" value={Math.round(node.w ?? 150)} min={60} max={500} step={10}
+          onChange={(w) => updateNode(node.id, { w })} />
+        <NumberField label={t('floor.height')} unit="u" value={Math.round(node.h ?? 110)} min={50} max={400} step={10}
+          onChange={(h) => updateNode(node.id, { h })} />
+      </div>
+      {node.kind === 'custom' && (
+        <div className="space-y-1">
+          <span className="field-label">{t('insp.annotImage')}</span>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              const reader = new FileReader()
+              reader.onload = () => {
+                if (typeof reader.result === 'string') updateNode(node.id, { image: reader.result })
+              }
+              reader.readAsDataURL(file)
+              e.target.value = ''
+            }} />
+          <div className="flex gap-1.5">
+            <button className="btn-ghost flex flex-1 items-center justify-center gap-1.5" onClick={() => fileRef.current?.click()}>
+              <ImagePlus size={13} /> {node.image ? t('insp.annotReplace') : t('insp.annotUpload')}
+            </button>
+            {node.image && (
+              <button className="btn-ghost hover:!text-crit" title={t('common.close')}
+                onClick={() => updateNode(node.id, { image: undefined })}>
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      <p className="text-[10px] leading-relaxed text-slate-500">{t('insp.annotHint')}</p>
+    </>
   )
 }
 

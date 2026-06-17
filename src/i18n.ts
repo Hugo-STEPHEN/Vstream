@@ -379,6 +379,16 @@ const STRINGS = {
 
   // Inspector
   'insp.resetColor': { en: 'Reset to default', fr: 'Réinitialiser' },
+  'insp.annotText': { en: 'Text', fr: 'Texte' },
+  'insp.annotImage': { en: 'Image', fr: 'Image' },
+  'insp.annotUpload': { en: 'Upload image…', fr: 'Charger une image…' },
+  'insp.annotReplace': { en: 'Replace image…', fr: 'Remplacer l’image…' },
+  'insp.annotHint': {
+    en: 'Annotations float freely over the whole sheet and are excluded from the math. Drag to move, double-click to select.',
+    fr: 'Les annotations flottent librement sur toute la feuille et sont exclues des calculs. Glissez pour déplacer, double-cliquez pour sélectionner.',
+  },
+  // Toolbox category
+  'cat.Annotations': { en: 'Annotations', fr: 'Annotations' },
 } as const
 
 export type StringKey = keyof typeof STRINGS

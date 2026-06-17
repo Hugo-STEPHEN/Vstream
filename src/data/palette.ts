@@ -4,7 +4,7 @@ export interface PaletteEntry {
   kind: NodeKind
   label: string
   lane: Lane
-  category: 'Flow essentials' | 'Pull & Kanban' | 'Logistics' | 'Resources & Quality' | 'Information'
+  category: 'Flow essentials' | 'Pull & Kanban' | 'Logistics' | 'Resources & Quality' | 'Information' | 'Annotations'
   keywords: string
   simple: boolean
   defaults: Partial<VsmNode>
@@ -34,6 +34,9 @@ export const NODE_LANE: Record<NodeKind, Lane> = {
   erp: 'information',
   schedule: 'information',
   goSee: 'information',
+  postit: 'material',
+  kaizen: 'material',
+  custom: 'material',
 }
 
 export const PALETTE: PaletteEntry[] = [
@@ -141,6 +144,22 @@ export const PALETTE: PaletteEntry[] = [
   {
     kind: 'goSee', label: 'Go-see / verbal', lane: 'information', category: 'Information',
     keywords: 'go see verbal gemba walk eyeball expedite', simple: false, defaults: {},
+  },
+  // --- Annotations (float freely, no math) ---
+  {
+    kind: 'postit', label: 'Post-it note', lane: 'material', category: 'Annotations',
+    keywords: 'post-it note sticky comment remark annotation memo', simple: false,
+    defaults: { label: 'Note', note: 'Double-click to edit…', color: '#FBBF24', w: 150, h: 110 },
+  },
+  {
+    kind: 'kaizen', label: 'Kaizen burst', lane: 'material', category: 'Annotations',
+    keywords: 'kaizen burst improvement flash idea opportunity star', simple: false,
+    defaults: { label: 'Kaizen', note: 'Improvement opportunity', color: '#F87171', w: 150, h: 120 },
+  },
+  {
+    kind: 'custom', label: 'Custom block', lane: 'material', category: 'Annotations',
+    keywords: 'custom block generic image picture rename free shape box', simple: false,
+    defaults: { label: 'Custom', color: '#22D3EE', w: 160, h: 110 },
   },
 ]
 

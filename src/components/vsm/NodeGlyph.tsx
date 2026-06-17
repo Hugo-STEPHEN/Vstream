@@ -6,6 +6,30 @@ import type { NodeKind } from '../../types'
  */
 export function NodeGlyph({ kind }: { kind: NodeKind }) {
   switch (kind) {
+    case 'postit':
+      return (
+        <g>
+          <path d="M -38 -28 H 38 V 16 L 22 28 H -38 Z" fill="currentColor" fillOpacity={0.25} stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+          <path d="M 38 16 L 22 16 L 22 28 Z" fill="currentColor" fillOpacity={0.5} />
+          <line x1={-28} y1={-12} x2={28} y2={-12} stroke="currentColor" strokeWidth={1.5} opacity={0.6} />
+          <line x1={-28} y1={0} x2={20} y2={0} stroke="currentColor" strokeWidth={1.5} opacity={0.6} />
+        </g>
+      )
+    case 'kaizen':
+      return (
+        <g>
+          <path d="M0,-32 L7,-11 L29,-13 L12,1 L20,22 L0,10 L-20,22 L-12,1 L-29,-13 L-7,-11 Z"
+            fill="currentColor" fillOpacity={0.22} stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+        </g>
+      )
+    case 'custom':
+      return (
+        <g>
+          <rect x={-40} y={-30} width={80} height={60} rx={6} fill="#0B0F19" stroke="currentColor" strokeWidth={1.5} strokeDasharray="5 3" />
+          <path d="M -16 10 l 10 -12 l 8 9 l 6 -7 l 10 10" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+          <circle cx={-10} cy={-8} r={4} fill="currentColor" />
+        </g>
+      )
     case 'process':
       return (
         <g>

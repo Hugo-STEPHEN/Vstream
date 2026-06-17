@@ -2,8 +2,9 @@ import { create } from 'zustand'
 import { NODE_LANE, PALETTE_BY_KIND } from './data/palette'
 import { createDemoProject, createBlankProject } from './data/demo'
 import { mergeCalibration } from './lib/calibration'
-import { boundingBox, clampToLane } from './lib/geometry'
+import { boundingBox, clampToLane, clampToSheet } from './lib/geometry'
 import { parseProjectJson } from './lib/exporters'
+import { isAnnotationKind } from './types'
 import type {
   CalibrationConfig,
   DemandConfig,
@@ -236,7 +237,9 @@ export const useApp = create<AppState>((set, get) => ({
     set((s) => {
       const entry = PALETTE_BY_KIND.get(kind)
       const lane = NODE_LANE[kind]
-      const pos = clampToLane(lane, snapTo(s, x), snapTo(s, y))
+      const pos = isAnnotationKind(kind)
+        ? clampToSheet(snapTo(s, x), snapTo(s, y))
+        : clampToLane(lane, snapTo(s, x), snapTo(s, y))
       const node: VsmNode = {
         id: nextId('n'),
         kind,
@@ -250,7 +253,14 @@ export const useApp = create<AppState>((set, get) => ({
   moveNode: (id, x, y) =>
     set((s) => ({
       nodes: s.nodes.map((n) =>
-        n.id === id ? { ...n, ...clampToLane(NODE_LANE[n.kind], snapTo(s, x), snapTo(s, y)) } : n,
+        n.id === id
+          ? {
+              ...n,
+              ...(isAnnotationKind(n.kind)
+                ? clampToSheet(snapTo(s, x), snapTo(s, y))
+                : clampToLane(NODE_LANE[n.kind], snapTo(s, x), snapTo(s, y))),
+            }
+          : n,
       ),
     })),
 

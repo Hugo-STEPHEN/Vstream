@@ -21,6 +21,14 @@ export function clampToLane(lane: Lane, x: number, y: number): { x: number; y: n
   }
 }
 
+/** Annotations float freely — only keep them inside the sheet bounds. */
+export function clampToSheet(x: number, y: number): { x: number; y: number } {
+  return {
+    x: Math.min(SHEET.width - 20, Math.max(20, x)),
+    y: Math.min(SHEET.height - 20, Math.max(20, y)),
+  }
+}
+
 /** Shoelace area of a polygon, canvas units². */
 export function polygonArea(points: { x: number; y: number }[]): number {
   let a = 0
