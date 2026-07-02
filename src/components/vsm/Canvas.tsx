@@ -698,6 +698,7 @@ function AnnotationShape({
 
 function TimelineLadder({ metrics }: { metrics: SystemMetrics }) {
   const { t } = useT()
+  const nodes = useApp((s) => s.nodes)
   const { ladder, leadTimeSeconds, totalValueAddSeconds, totalNvaSeconds, pce, availableSecondsPerDay } = metrics
   if (ladder.length === 0) {
     return (
@@ -708,57 +709,76 @@ function TimelineLadder({ metrics }: { metrics: SystemMetrics }) {
     )
   }
 
-  const left = 50
-  const right = SHEET.width - 320
-  const width = right - left
-  const topY = SHEET.timeline.top + 70
-  const botY = SHEET.timeline.bottom - 80
+  const xById = new Map(nodes.map((n) => [n.id, n.x]))
+  const right = SHEET.width - 300
+  const vaLineY = SHEET.timeline.top + 128
+  const nvaLineY = vaLineY + 46
+  const maxBar = 62
+  const halfW = 26
 
-  const total = Math.max(1, leadTimeSeconds)
-  const minW = 36
-  // Proportional widths with a readable floor, renormalized to fit.
-  const rawW = ladder.map((s) => Math.max(minW, (displaySeconds(s) / total) * width))
-  const scale = width / rawW.reduce((a, b) => a + b, 0)
-  const widths = rawW.map((w) => w * scale)
+  // Duration → bar height, log-scaled so seconds and days coexist readably.
+  const lg = (s: number) => Math.log(1 + Math.max(0, s))
+  const hiLog = lg(Math.max(leadTimeSeconds, 1))
+  const barH = (sec: number) => (hiLog <= 0 ? 4 : 6 + Math.min(1, lg(sec) / hiLog) * (maxBar - 6))
 
-  let x = left
-  const segs = ladder.map((step, i) => {
-    const w = widths[i]
-    const seg = { step, x, w }
-    x += w
-    return seg
+  // Each step sits under the x of its node above (aligned, not to-scale in width).
+  const segs = ladder.map((step) => {
+    const nx = xById.get(step.nodeId) ?? 0
+    const x = Math.max(60, Math.min(right - 30, nx))
+    const isVa = step.type === 'va'
+    return { step, x, isVa, level: isVa ? vaLineY : nvaLineY }
   })
 
-  const wave = segs
-    .map((s, i) => {
-      const y = s.step.type === 'va' ? topY : botY
-      const prevY = i === 0 ? botY : segs[i - 1].step.type === 'va' ? topY : botY
-      return `${i === 0 ? `M ${s.x} ${y}` : prevY !== y ? `L ${s.x} ${y}` : ''} L ${s.x + s.w} ${y}`
-    })
-    .join(' ')
+  // Square wave connecting the aligned plateaus.
+  const wave: string[] = []
+  segs.forEach((s, i) => {
+    const startX = s.x - halfW
+    const endX = s.x + halfW
+    if (i === 0) wave.push(`M ${startX} ${s.level}`)
+    else {
+      const prev = segs[i - 1]
+      const mid = (prev.x + halfW + startX) / 2
+      wave.push(`L ${mid} ${prev.level} L ${mid} ${s.level} L ${startX} ${s.level}`)
+    }
+    wave.push(`L ${endX} ${s.level}`)
+  })
 
   return (
     <g pointerEvents="none">
-      <path d={wave} fill="none" stroke="#FBBF24" strokeWidth={2} strokeLinejoin="miter" />
-      {segs.map(({ step, x: sx, w }) => {
-        const isVa = step.type === 'va'
-        const y = isVa ? topY : botY
+      {/* reference lines */}
+      <line x1={40} y1={vaLineY} x2={right} y2={vaLineY} stroke="#1E293B" strokeWidth={1} strokeDasharray="3 5" />
+      <line x1={40} y1={nvaLineY} x2={right} y2={nvaLineY} stroke="#1E293B" strokeWidth={1} strokeDasharray="3 5" />
+      <text x={44} y={vaLineY - maxBar - 6} fill="#34D399" fontFamily={MONO} fontSize={9} opacity={0.7}>VA ▲</text>
+      <text x={44} y={nvaLineY + maxBar + 14} fill="#FBBF24" fontFamily={MONO} fontSize={9} opacity={0.7}>NVA ▼</text>
+
+      <path d={wave.join(' ')} fill="none" stroke="#475569" strokeWidth={1.5} strokeLinejoin="miter" />
+
+      {segs.map(({ step, x: sx, isVa, level }) => {
+        const bh = barH(step.seconds)
+        const color = isVa ? '#34D399' : '#FBBF24'
+        // Faint connector up to the element above, to show the alignment.
         return (
           <g key={`${step.nodeId}-${isVa ? 'va' : 'nva'}`}>
-            <line x1={sx} y1={y} x2={sx} y2={isVa ? y - 8 : y + 8} stroke="#FBBF24" strokeWidth={1} opacity={0.5} />
-            <text x={sx + w / 2} y={isVa ? y - 14 : y + 22} textAnchor="middle"
-              fill={isVa ? '#34D399' : '#FBBF24'} fontFamily={MONO} fontSize={10.5}>
-              {isVa ? fmtSeconds((step as { seconds: number }).seconds) : fmtDays(step.seconds, availableSecondsPerDay)}
+            <line x1={sx} y1={SHEET.timeline.top + 4} x2={sx} y2={isVa ? level - bh : level + bh}
+              stroke={color} strokeWidth={0.7} strokeDasharray="2 4" opacity={0.28} />
+            {isVa ? (
+              <rect x={sx - halfW} y={level - bh} width={halfW * 2} height={bh} rx={2} fill={color} fillOpacity={0.32} stroke={color} strokeWidth={1} />
+            ) : (
+              <rect x={sx - halfW} y={level} width={halfW * 2} height={bh} rx={2} fill={color} fillOpacity={0.22} stroke={color} strokeWidth={1} />
+            )}
+            <text x={sx} y={isVa ? level - bh - 5 : level + bh + 12} textAnchor="middle" fill={color} fontFamily={MONO} fontSize={10}>
+              {isVa ? fmtSeconds(step.seconds) : fmtDays(step.seconds, availableSecondsPerDay)}
             </text>
-            <text x={sx + w / 2} y={isVa ? y - 28 : y + 36} textAnchor="middle" fill="#475569" fontFamily={UI_FONT} fontSize={9}>
-              {truncate(step.label, Math.max(6, Math.floor(w / 6)))}
+            <text x={sx} y={isVa ? level + 14 : level - 6} textAnchor="middle" fill="#475569" fontFamily={UI_FONT} fontSize={8.5}>
+              {truncate(step.label, 12)}
             </text>
           </g>
         )
       })}
+
       {/* Totals box */}
-      <g transform={`translate(${right + 24} ${SHEET.timeline.top + 46})`}>
-        <rect x={0} y={0} width={270} height={150} rx={8} fill="#0B0F19" stroke="#1E293B" />
+      <g transform={`translate(${right + 12} ${SHEET.timeline.top + 46})`}>
+        <rect x={0} y={0} width={258} height={150} rx={8} fill="#0B0F19" stroke="#1E293B" />
         <text x={16} y={28} fill="#94A3B8" fontFamily={DISPLAY} fontSize={11} letterSpacing={2}>{t('canvas.flowSummary')}</text>
         {(
           [
@@ -770,16 +790,16 @@ function TimelineLadder({ metrics }: { metrics: SystemMetrics }) {
         ).map(([label, value, color], i) => (
           <g key={label} transform={`translate(16 ${52 + i * 24})`}>
             <text x={0} y={0} fill="#64748B" fontFamily={UI_FONT} fontSize={11}>{label}</text>
-            <text x={238} y={0} textAnchor="end" fill={color} fontFamily={MONO} fontSize={13}>{value}</text>
+            <text x={226} y={0} textAnchor="end" fill={color} fontFamily={MONO} fontSize={13}>{value}</text>
           </g>
         ))}
       </g>
+      <text x={44} y={SHEET.timeline.bottom - 8} fill="#475569" fontFamily={UI_FONT} fontSize={9}>
+        {t('canvas.ladderHint')}
+      </text>
     </g>
   )
 }
-
-const displaySeconds = (s: { type: string; seconds: number; ctGrand?: number }): number =>
-  s.type === 'va' ? Math.max(s.seconds, s.ctGrand ?? 0) : s.seconds
 
 function fmtDays(seconds: number, availableSecondsPerDay: number): string {
   if (availableSecondsPerDay > 0 && seconds >= availableSecondsPerDay * 0.2) {
