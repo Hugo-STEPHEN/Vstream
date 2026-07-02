@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../../store'
 import { NODE_LANE } from '../../data/palette'
-import { SHEET, NODE_W, NODE_H } from '../../lib/geometry'
+import { NODE_W, NODE_H, sheetLayout, type SheetLayout } from '../../lib/geometry'
 import { fmtSeconds, isInventoryKind, isProcessKind } from '../../lib/analytics'
 import { useSystemMetrics } from '../../lib/useMetrics'
 import { Grid3X3 } from 'lucide-react'
@@ -32,6 +32,7 @@ export function VsmCanvas({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }
   const selectedEdgeId = useApp((s) => s.selectedEdgeId)
   const calibration = useApp((s) => s.calibration)
   const prefs = useApp((s) => s.prefs)
+  const sheet = useMemo(() => sheetLayout(prefs.laneInfoH, prefs.laneMaterialH), [prefs.laneInfoH, prefs.laneMaterialH])
   const [gridOpen, setGridOpen] = useState(false)
 
   const metrics = useSystemMetrics()
@@ -49,13 +50,13 @@ export function VsmCanvas({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }
     const el = containerRef.current
     if (!el) return
     const r = el.getBoundingClientRect()
-    const k = Math.min(r.width / SHEET.width, r.height / SHEET.height) * 0.98
+    const k = Math.min(r.width / sheet.width, r.height / sheet.height) * 0.98
     setView({
       k,
-      x: (r.width - SHEET.width * k) / 2,
-      y: (r.height - SHEET.height * k) / 2,
+      x: (r.width - sheet.width * k) / 2,
+      y: (r.height - sheet.height * k) / 2,
     })
-  }, [])
+  }, [sheet])
 
   useEffect(() => {
     fitView()
@@ -165,9 +166,9 @@ export function VsmCanvas({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }
         </defs>
 
         <g data-world transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
-          <Lanes />
+          <Lanes sheet={sheet} />
           {prefs.vsmGrid && (
-            <rect x={0} y={0} width={SHEET.width} height={SHEET.height} fill="url(#grid)" pointerEvents="none" />
+            <rect x={0} y={0} width={sheet.width} height={sheet.height} fill="url(#grid)" pointerEvents="none" />
           )}
 
           {edges.map((edge) => (
@@ -208,7 +209,7 @@ export function VsmCanvas({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }
             ),
           )}
 
-          <TimelineLadder metrics={metrics} />
+          <TimelineLadder metrics={metrics} sheet={sheet} />
         </g>
       </svg>
 
@@ -240,6 +241,12 @@ export function VsmCanvas({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }
           </label>
           <NumberField label={t('canvas.gridStep')} unit="units" value={prefs.snapStep} min={5} max={100} step={5}
             onChange={(snapStep) => useApp.getState().setPrefs({ snapStep })} />
+          <div className="space-y-2 border-t border-edge pt-2">
+            <NumberField label={t('canvas.laneInfoH')} unit="u" value={prefs.laneInfoH} min={120} max={500} step={10} slider
+              onChange={(laneInfoH) => useApp.getState().setPrefs({ laneInfoH })} />
+            <NumberField label={t('canvas.laneMaterialH')} unit="u" value={prefs.laneMaterialH} min={160} max={600} step={10} slider
+              onChange={(laneMaterialH) => useApp.getState().setPrefs({ laneMaterialH })} />
+          </div>
         </div>
       )}
 
@@ -252,21 +259,21 @@ export function VsmCanvas({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }
   )
 }
 
-function Lanes() {
+function Lanes({ sheet }: { sheet: SheetLayout }) {
   const { t } = useT()
   return (
     <g pointerEvents="none">
-      <rect x={0} y={SHEET.info.top} width={SHEET.width} height={SHEET.info.bottom - SHEET.info.top} fill="#818CF8" opacity={0.03} />
-      <rect x={0} y={SHEET.material.top} width={SHEET.width} height={SHEET.material.bottom - SHEET.material.top} fill="#22D3EE" opacity={0.025} />
-      <rect x={0} y={SHEET.timeline.top} width={SHEET.width} height={SHEET.timeline.bottom - SHEET.timeline.top} fill="#FBBF24" opacity={0.02} />
-      {[SHEET.info.bottom, SHEET.material.bottom].map((y) => (
-        <line key={y} x1={0} y1={y} x2={SHEET.width} y2={y} stroke="#1E293B" strokeWidth={1.5} strokeDasharray="10 8" />
+      <rect x={0} y={sheet.info.top} width={sheet.width} height={sheet.info.bottom - sheet.info.top} fill="#818CF8" opacity={0.03} />
+      <rect x={0} y={sheet.material.top} width={sheet.width} height={sheet.material.bottom - sheet.material.top} fill="#22D3EE" opacity={0.025} />
+      <rect x={0} y={sheet.timeline.top} width={sheet.width} height={sheet.timeline.bottom - sheet.timeline.top} fill="#FBBF24" opacity={0.02} />
+      {[sheet.info.bottom, sheet.material.bottom].map((y) => (
+        <line key={y} x1={0} y1={y} x2={sheet.width} y2={y} stroke="#1E293B" strokeWidth={1.5} strokeDasharray="10 8" />
       ))}
       {(
         [
-          [t('canvas.laneInfo'), SHEET.info.top + 24, '#818CF8'],
-          [t('canvas.laneMaterial'), SHEET.material.top + 24, '#22D3EE'],
-          [t('canvas.laneTimeline'), SHEET.timeline.top + 24, '#FBBF24'],
+          [t('canvas.laneInfo'), sheet.info.top + 24, '#818CF8'],
+          [t('canvas.laneMaterial'), sheet.material.top + 24, '#22D3EE'],
+          [t('canvas.laneTimeline'), sheet.timeline.top + 24, '#FBBF24'],
         ] as const
       ).map(([label, y, color]) => (
         <text key={label} x={16} y={y} fill={color} opacity={0.55} fontSize={13} fontFamily={DISPLAY} letterSpacing={3}>
@@ -697,13 +704,13 @@ function AnnotationShape({
 // Timeline ladder
 // ---------------------------------------------------------------------------
 
-function TimelineLadder({ metrics }: { metrics: SystemMetrics }) {
+function TimelineLadder({ metrics, sheet }: { metrics: SystemMetrics; sheet: SheetLayout }) {
   const { t } = useT()
   const nodes = useApp((s) => s.nodes)
   const { ladder, leadTimeSeconds, totalValueAddSeconds, totalNvaSeconds, pce, availableSecondsPerDay } = metrics
   if (ladder.length === 0) {
     return (
-      <text x={SHEET.width / 2} y={(SHEET.timeline.top + SHEET.timeline.bottom) / 2} textAnchor="middle"
+      <text x={sheet.width / 2} y={(sheet.timeline.top + sheet.timeline.bottom) / 2} textAnchor="middle"
         fill="#475569" fontSize={13} fontFamily={UI_FONT}>
         {t('canvas.emptyLadder')}
       </text>
@@ -711,8 +718,8 @@ function TimelineLadder({ metrics }: { metrics: SystemMetrics }) {
   }
 
   const xById = new Map(nodes.map((n) => [n.id, n.x]))
-  const right = SHEET.width - 300
-  const vaLineY = SHEET.timeline.top + 128
+  const right = sheet.width - 300
+  const vaLineY = sheet.timeline.top + 128
   const nvaLineY = vaLineY + 46
   const maxBar = 62
   const halfW = 26
@@ -760,7 +767,7 @@ function TimelineLadder({ metrics }: { metrics: SystemMetrics }) {
         // Faint connector up to the element above, to show the alignment.
         return (
           <g key={`${step.nodeId}-${isVa ? 'va' : 'nva'}`}>
-            <line x1={sx} y1={SHEET.timeline.top + 4} x2={sx} y2={isVa ? level - bh : level + bh}
+            <line x1={sx} y1={sheet.timeline.top + 4} x2={sx} y2={isVa ? level - bh : level + bh}
               stroke={color} strokeWidth={0.7} strokeDasharray="2 4" opacity={0.28} />
             {isVa ? (
               <rect x={sx - halfW} y={level - bh} width={halfW * 2} height={bh} rx={2} fill={color} fillOpacity={0.32} stroke={color} strokeWidth={1} />
@@ -778,7 +785,7 @@ function TimelineLadder({ metrics }: { metrics: SystemMetrics }) {
       })}
 
       {/* Totals box */}
-      <g transform={`translate(${right + 12} ${SHEET.timeline.top + 46})`}>
+      <g transform={`translate(${right + 12} ${sheet.timeline.top + 46})`}>
         <rect x={0} y={0} width={258} height={150} rx={8} fill="#0B0F19" stroke="#1E293B" />
         <text x={16} y={28} fill="#94A3B8" fontFamily={DISPLAY} fontSize={11} letterSpacing={2}>{t('canvas.flowSummary')}</text>
         {(
@@ -795,7 +802,7 @@ function TimelineLadder({ metrics }: { metrics: SystemMetrics }) {
           </g>
         ))}
       </g>
-      <text x={44} y={SHEET.timeline.bottom - 8} fill="#475569" fontFamily={UI_FONT} fontSize={9}>
+      <text x={44} y={sheet.timeline.bottom - 8} fill="#475569" fontFamily={UI_FONT} fontSize={9}>
         {t('canvas.ladderHint')}
       </text>
     </g>

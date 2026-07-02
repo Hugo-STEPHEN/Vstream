@@ -1,31 +1,52 @@
 import type { Lane } from '../types'
 
-/** World-coordinate layout of the VSM sheet (canvas units). */
-export const SHEET = {
-  width: 1900,
-  height: 940,
-  info: { top: 30, bottom: 300 },
-  material: { top: 300, bottom: 640 },
-  timeline: { top: 640, bottom: 930 },
-} as const
+export interface SheetLayout {
+  width: number
+  height: number
+  info: { top: number; bottom: number }
+  material: { top: number; bottom: number }
+  timeline: { top: number; bottom: number }
+}
+
+const SHEET_TOP = 30
+const TIMELINE_H = 290
+export const DEFAULT_INFO_H = 270
+export const DEFAULT_MATERIAL_H = 340
+
+/** Build the sheet layout from adjustable lane heights (auto-flows the timeline). */
+export function sheetLayout(infoH: number = DEFAULT_INFO_H, materialH: number = DEFAULT_MATERIAL_H): SheetLayout {
+  const infoBottom = SHEET_TOP + Math.max(120, infoH)
+  const matBottom = infoBottom + Math.max(160, materialH)
+  const tlBottom = matBottom + TIMELINE_H
+  return {
+    width: 1900,
+    height: tlBottom + 10,
+    info: { top: SHEET_TOP, bottom: infoBottom },
+    material: { top: infoBottom, bottom: matBottom },
+    timeline: { top: matBottom, bottom: tlBottom },
+  }
+}
+
+/** Default layout (kept for callers that don't have prefs). */
+export const SHEET: SheetLayout = sheetLayout()
 
 export const NODE_W = 116
 export const NODE_H = 84
 
 /** Clamp a node's centre into its authorized lane. */
-export function clampToLane(lane: Lane, x: number, y: number): { x: number; y: number } {
-  const band = lane === 'information' ? SHEET.info : SHEET.material
+export function clampToLane(lane: Lane, x: number, y: number, sheet: SheetLayout = SHEET): { x: number; y: number } {
+  const band = lane === 'information' ? sheet.info : sheet.material
   return {
-    x: Math.min(SHEET.width - NODE_W / 2 - 10, Math.max(NODE_W / 2 + 10, x)),
+    x: Math.min(sheet.width - NODE_W / 2 - 10, Math.max(NODE_W / 2 + 10, x)),
     y: Math.min(band.bottom - NODE_H / 2 - 6, Math.max(band.top + NODE_H / 2 + 6, y)),
   }
 }
 
 /** Annotations float freely — only keep them inside the sheet bounds. */
-export function clampToSheet(x: number, y: number): { x: number; y: number } {
+export function clampToSheet(x: number, y: number, sheet: SheetLayout = SHEET): { x: number; y: number } {
   return {
-    x: Math.min(SHEET.width - 20, Math.max(20, x)),
-    y: Math.min(SHEET.height - 20, Math.max(20, y)),
+    x: Math.min(sheet.width - 20, Math.max(20, x)),
+    y: Math.min(sheet.height - 20, Math.max(20, y)),
   }
 }
 

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { NODE_LANE, PALETTE_BY_KIND } from './data/palette'
 import { createDemoProject, createBlankProject } from './data/demo'
 import { mergeCalibration } from './lib/calibration'
-import { boundingBox, clampToLane, clampToSheet } from './lib/geometry'
+import { boundingBox, clampToLane, clampToSheet, sheetLayout } from './lib/geometry'
 import { parseProjectJson } from './lib/exporters'
 import { isAnnotationKind } from './types'
 import type {
@@ -44,6 +44,10 @@ export interface ViewPrefs {
   floorGridStep: number
   /** Show each object's snap anchor point. */
   showAnchors: boolean
+  /** Information-lane height (canvas units). */
+  laneInfoH: number
+  /** Material-lane height (canvas units). */
+  laneMaterialH: number
 }
 
 const DEFAULT_PREFS: ViewPrefs = {
@@ -53,6 +57,8 @@ const DEFAULT_PREFS: ViewPrefs = {
   floorGrid: true,
   floorGridStep: 50,
   showAnchors: false,
+  laneInfoH: 270,
+  laneMaterialH: 340,
 }
 
 function loadPrefs(): ViewPrefs {
@@ -244,9 +250,10 @@ export const useApp = create<AppState>((set, get) => ({
     set((s) => {
       const entry = PALETTE_BY_KIND.get(kind)
       const lane = NODE_LANE[kind]
+      const sheet = sheetLayout(s.prefs.laneInfoH, s.prefs.laneMaterialH)
       const pos = isAnnotationKind(kind)
-        ? clampToSheet(snapTo(s, x), snapTo(s, y))
-        : clampToLane(lane, snapTo(s, x), snapTo(s, y))
+        ? clampToSheet(snapTo(s, x), snapTo(s, y), sheet)
+        : clampToLane(lane, snapTo(s, x), snapTo(s, y), sheet)
       const node: VsmNode = {
         id: nextId('n'),
         kind,
@@ -258,18 +265,21 @@ export const useApp = create<AppState>((set, get) => ({
     }),
 
   moveNode: (id, x, y) =>
-    set((s) => ({
-      nodes: s.nodes.map((n) =>
-        n.id === id
-          ? {
-              ...n,
-              ...(isAnnotationKind(n.kind)
-                ? clampToSheet(snapTo(s, x), snapTo(s, y))
-                : clampToLane(NODE_LANE[n.kind], snapTo(s, x), snapTo(s, y))),
-            }
-          : n,
-      ),
-    })),
+    set((s) => {
+      const sheet = sheetLayout(s.prefs.laneInfoH, s.prefs.laneMaterialH)
+      return {
+        nodes: s.nodes.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                ...(isAnnotationKind(n.kind)
+                  ? clampToSheet(snapTo(s, x), snapTo(s, y), sheet)
+                  : clampToLane(NODE_LANE[n.kind], snapTo(s, x), snapTo(s, y), sheet)),
+              }
+            : n,
+        ),
+      }
+    }),
 
   updateNode: (id, patch) =>
     set((s) =>

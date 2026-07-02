@@ -127,6 +127,8 @@ const STRINGS = {
   'canvas.gridStep': { en: 'Snap step', fr: 'Pas de grille' },
   'canvas.gridSettings': { en: 'Grid & snapping', fr: 'Grille & aimantation' },
   'canvas.showAnchors': { en: 'Show anchor points', fr: 'Afficher les points d’ancrage' },
+  'canvas.laneInfoH': { en: 'Information lane height', fr: 'Hauteur couloir information' },
+  'canvas.laneMaterialH': { en: 'Material lane height', fr: 'Hauteur couloir matière' },
   'canvas.ladderHint': {
     en: 'Bars aligned under each element · height = duration (log scale), not width',
     fr: 'Barres alignées sous chaque élément · hauteur = durée (échelle log), pas la largeur',

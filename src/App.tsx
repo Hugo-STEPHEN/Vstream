@@ -16,7 +16,7 @@ import { computeBenchmarks, overallGrade } from './lib/benchmarks'
 import { generateKaizenSuggestions } from './lib/copilot'
 import { exportHtmlReport } from './lib/report'
 import { computeSpaghettiSummary, computeTransportAudit } from './lib/spaghetti'
-import { SHEET } from './lib/geometry'
+import { sheetLayout } from './lib/geometry'
 import { VsmCanvas } from './components/vsm/Canvas'
 import { Toolbox } from './components/vsm/Toolbox'
 import { Inspector } from './components/vsm/Inspector'
@@ -161,7 +161,8 @@ function TopBar({
     if (what === 'svg' || what === 'png') {
       const onFloor = s.tab === 'spaghetti'
       const svg = onFloor ? floorSvgRef.current : vsmSvgRef.current
-      const box = onFloor ? { width: FLOOR.width, height: FLOOR.height } : { width: SHEET.width, height: SHEET.height }
+      const vsmSheet = sheetLayout(s.prefs.laneInfoH, s.prefs.laneMaterialH)
+      const box = onFloor ? { width: FLOOR.width, height: FLOOR.height } : { width: vsmSheet.width, height: vsmSheet.height }
       const suffix = onFloor ? 'spaghetti' : 'vsm'
       if (svg) {
         if (what === 'svg') exportSvg(svg, `${name}_${suffix}.svg`, { worldBox: box })

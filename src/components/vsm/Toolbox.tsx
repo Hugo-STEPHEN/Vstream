@@ -6,7 +6,7 @@ import { fuzzyFilter } from '../../lib/fuzzy'
 import { useApp } from '../../store'
 import { useT } from '../../i18n'
 import { NodeGlyph } from './NodeGlyph'
-import { SHEET } from '../../lib/geometry'
+import { sheetLayout } from '../../lib/geometry'
 import type { EdgeKind } from '../../types'
 
 const EDGE_TOOLS: { kind: EdgeKind; label: string; hint: string }[] = [
@@ -148,8 +148,10 @@ export function Toolbox() {
 
 function PaletteItem({ entry }: { entry: PaletteEntry }) {
   const addNode = useApp((s) => s.addNode)
+  const prefs = useApp((s) => s.prefs)
   const place = () => {
-    const band = entry.lane === 'information' ? SHEET.info : SHEET.material
+    const sheet = sheetLayout(prefs.laneInfoH, prefs.laneMaterialH)
+    const band = entry.lane === 'information' ? sheet.info : sheet.material
     addNode(
       entry.kind,
       300 + Math.random() * 500,
