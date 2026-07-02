@@ -1,7 +1,7 @@
 {
   "name": "vstream-suite",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "vStream — Value Stream Intelligence Suite: VSM, spaghetti diagrams, flow analytics and industrial benchmarking",
   "type": "module",
   "scripts": {
