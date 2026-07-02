@@ -151,6 +151,19 @@ const STRINGS = {
   'floor.roiSub': { en: 'potential saving / year', fr: 'économie potentielle / an' },
   'floor.plantScale': { en: 'Plant scale', fr: 'Échelle de l’usine' },
   'floor.metersPerUnit': { en: 'Meters per canvas unit', fr: 'Mètres par unité de canevas' },
+  'floor.calibrate': { en: 'Scale', fr: 'Échelle' },
+  'floor.calibrateHint': { en: 'Draw a line of known length to set the plant scale', fr: 'Tracez une ligne de longueur connue pour régler l’échelle' },
+  'floor.calibrateDraw': { en: 'Calibrate by drawing a line', fr: 'Étalonner en traçant une ligne' },
+  'floor.calibratePrompt': {
+    en: 'How long is this line in the real plant?',
+    fr: 'Quelle est la longueur réelle de cette ligne dans l’usine ?',
+  },
+  'floor.calibrateExplain': {
+    en: 'Draw a segment over something of known size (a machine, a bay, a dimension on the CAD) and type its real length.',
+    fr: 'Tracez un segment sur un élément de taille connue (machine, travée, cote du plan CAO) et saisissez sa longueur réelle.',
+  },
+  'floor.currentScale': { en: 'Current scale', fr: 'Échelle actuelle' },
+  'floor.recalibrate': { en: 'Redraw', fr: 'Retracer' },
   'floor.underlay': { en: 'Floor plan underlay', fr: 'Plan au sol en fond' },
   'floor.upload': { en: 'Upload plant layout…', fr: 'Charger un plan d’usine…' },
   'floor.replace': { en: 'Replace image…', fr: 'Remplacer l’image…' },
@@ -173,7 +186,14 @@ const STRINGS = {
   'floor.height': { en: 'Height', fr: 'Hauteur' },
   'floor.color': { en: 'Color', fr: 'Couleur' },
   'floor.vertices': { en: 'vertices', fr: 'sommets' },
-  'floor.dragHandles': { en: 'Drag the cyan handles on the canvas to reshape the route.', fr: 'Glissez les poignées cyan sur le canevas pour remodeler le trajet.' },
+  'floor.dragHandles': {
+    en: 'Drag the cyan handles to move a point · click a green + to add one · Alt/right-click a point to remove it.',
+    fr: 'Glissez les poignées cyan pour déplacer un point · cliquez un + vert pour en ajouter · Alt/clic-droit sur un point pour le retirer.',
+  },
+  'floor.dragVertices': {
+    en: 'Drag the cyan vertices · click a green + to add one · Alt/right-click a vertex to remove it.',
+    fr: 'Glissez les sommets cyan · cliquez un + vert pour en ajouter · Alt/clic-droit sur un sommet pour le retirer.',
+  },
   'floor.operatorCircuit': { en: 'Operator circuit (eats production time)', fr: 'Circuit opérateur (consomme du temps de prod.)' },
   'floor.circuitHint': {
     en: 'The walk time is charged against the linked station’s available time — it lowers its TRS, capacity and the whole flow.',
@@ -183,7 +203,6 @@ const STRINGS = {
   'floor.purpose.info': { en: 'Gather info (what to produce)', fr: 'Chercher l’info (quoi produire)' },
   'floor.purpose.navigation': { en: 'Navigate between process steps', fr: 'Naviguer entre les étapes du procédé' },
   'floor.circuitTag': { en: 'circuit', fr: 'circuit' },
-  'floor.dragVertices': { en: 'Drag the cyan vertex handles on the canvas to match the real footprint.', fr: 'Glissez les sommets cyan sur le canevas pour épouser l’emprise réelle.' },
   // Station analysis
   'station.stations': { en: 'Stations', fr: 'Postes' },
   'station.params': { en: 'live parameters', fr: 'paramètres en direct' },

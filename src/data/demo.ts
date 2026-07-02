@@ -71,12 +71,12 @@ const edges: VsmEdge[] = [
 const spaghetti: SpaghettiState = {
   metersPerUnit: 0.12,
   zones: [
-    { id: 'z1', name: 'Receiving dock', x: 60, y: 80, w: 220, h: 160, color: '#818CF8' },
-    { id: 'z2', name: 'Coil storage', x: 60, y: 300, w: 220, h: 200, color: '#94A3B8' },
-    { id: 'z3', name: 'Stamping cell', x: 380, y: 120, w: 260, h: 180, color: '#22D3EE' },
-    { id: 'z4', name: 'Weld bay', x: 740, y: 120, w: 240, h: 180, color: '#FBBF24' },
-    { id: 'z5', name: 'Assembly line', x: 380, y: 400, w: 600, h: 160, color: '#34D399' },
-    { id: 'z6', name: 'FG warehouse', x: 1080, y: 320, w: 240, h: 240, color: '#F87171' },
+    { id: 'z1', name: 'Receiving dock', x: 60, y: 80, w: 220, h: 160, color: '#818CF8', points: [{ x: 60, y: 80 }, { x: 280, y: 80 }, { x: 280, y: 240 }, { x: 60, y: 240 }] },
+    { id: 'z2', name: 'Coil storage', x: 60, y: 300, w: 220, h: 200, color: '#94A3B8', points: [{ x: 60, y: 300 }, { x: 280, y: 300 }, { x: 280, y: 500 }, { x: 60, y: 500 }] },
+    { id: 'z3', name: 'Stamping cell', x: 380, y: 120, w: 260, h: 180, color: '#22D3EE', points: [{ x: 380, y: 120 }, { x: 640, y: 120 }, { x: 640, y: 300 }, { x: 380, y: 300 }] },
+    { id: 'z4', name: 'Weld bay', x: 740, y: 120, w: 240, h: 180, color: '#FBBF24', points: [{ x: 740, y: 120 }, { x: 980, y: 120 }, { x: 980, y: 300 }, { x: 740, y: 300 }] },
+    { id: 'z5', name: 'Assembly line', x: 380, y: 400, w: 600, h: 160, color: '#34D399', points: [{ x: 380, y: 400 }, { x: 980, y: 400 }, { x: 980, y: 560 }, { x: 380, y: 560 }] },
+    { id: 'z6', name: 'FG warehouse', x: 1080, y: 320, w: 240, h: 240, color: '#F87171', points: [{ x: 1080, y: 320 }, { x: 1320, y: 320 }, { x: 1320, y: 560 }, { x: 1080, y: 560 }] },
   ],
   routes: [
     {

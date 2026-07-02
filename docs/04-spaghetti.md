@@ -55,8 +55,14 @@ pertes (souvent la plus grande !). C'est le pont concret entre l'implantation
 physique et la performance : raccourcir un trajet ou changer son mode se traduit
 directement en points de TRS et en capacité.
 
-## En cours d'évolution
+## Étalonnage & édition
 
-L'étalonnage de l'échelle « au trait » (tracer une ligne de longueur connue) et
-l'ajout/suppression de sommets de polygone sont des chantiers prévus — voir la
-feuille de route dans le README.
+- **Échelle au trait** : outil **Échelle** (règle) → tracez une ligne sur un
+  élément de taille connue (machine, travée, cote CAO) et saisissez sa longueur
+  réelle. L'échelle mètres/unité en est déduite (plus besoin de la saisir à la main).
+- **Zones = polygones** : toute zone est un polygone éditable. Glissez les sommets
+  cyan pour la déformer, cliquez un **+** vert au milieu d'une arête pour ajouter
+  un sommet, **Alt/clic-droit** sur un sommet pour le retirer. L'outil **Zone**
+  trace un rectangle rapide (lui aussi éditable ensuite) ; l'outil **Poly** trace
+  une forme libre.
+- **Trajets** : mêmes gestes d'édition (glisser / + / Alt-clic) sur les points.

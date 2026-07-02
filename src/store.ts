@@ -22,7 +22,7 @@ import type {
 
 export type AppTab = 'vsm' | 'spaghetti' | 'analytics' | 'benchmarks' | 'station'
 export type VsmTool = 'select' | 'connect'
-export type SpaghettiTool = 'select' | 'zone' | 'poly' | 'route'
+export type SpaghettiTool = 'select' | 'zone' | 'poly' | 'route' | 'calibrate'
 
 let idSeq = Date.now() % 100000
 export const nextId = (prefix: string): string => `${prefix}_${(idSeq++).toString(36)}`
@@ -138,6 +138,10 @@ export interface AppState {
   finishDraftPoly: () => void
   cancelDraftPoly: () => void
   moveZonePoint: (zoneId: string, index: number, x: number, y: number) => void
+  insertZonePoint: (zoneId: string, index: number, x: number, y: number) => void
+  removeZonePoint: (zoneId: string, index: number) => void
+  insertRoutePoint: (routeId: string, index: number, x: number, y: number) => void
+  removeRoutePoint: (routeId: string, index: number) => void
   deleteFloorSelection: () => void
   setMetersPerUnit: (v: number) => void
   setFloorBackground: (bg: FloorBackground | null) => void
@@ -395,6 +399,58 @@ export const useApp = create<AppState>((set, get) => ({
         }),
       },
     })),
+  insertZonePoint: (zoneId, index, x, y) =>
+    set((s) =>
+      withHistory(s, {
+        spaghetti: {
+          ...s.spaghetti,
+          zones: s.spaghetti.zones.map((z) => {
+            if (z.id !== zoneId || !z.points) return z
+            const points = [...z.points.slice(0, index + 1), { x, y }, ...z.points.slice(index + 1)]
+            return { ...z, ...boundingBox(points), points }
+          }),
+        },
+      }),
+    ),
+  removeZonePoint: (zoneId, index) =>
+    set((s) =>
+      withHistory(s, {
+        spaghetti: {
+          ...s.spaghetti,
+          zones: s.spaghetti.zones.map((z) => {
+            if (z.id !== zoneId || !z.points || z.points.length <= 3) return z
+            const points = z.points.filter((_, i) => i !== index)
+            return { ...z, ...boundingBox(points), points }
+          }),
+        },
+      }),
+    ),
+  insertRoutePoint: (routeId, index, x, y) =>
+    set((s) =>
+      withHistory(s, {
+        spaghetti: {
+          ...s.spaghetti,
+          routes: s.spaghetti.routes.map((r) =>
+            r.id === routeId
+              ? { ...r, points: [...r.points.slice(0, index + 1), { x, y }, ...r.points.slice(index + 1)] }
+              : r,
+          ),
+        },
+      }),
+    ),
+  removeRoutePoint: (routeId, index) =>
+    set((s) =>
+      withHistory(s, {
+        spaghetti: {
+          ...s.spaghetti,
+          routes: s.spaghetti.routes.map((r) =>
+            r.id === routeId && r.points.length > 2
+              ? { ...r, points: r.points.filter((_, i) => i !== index) }
+              : r,
+          ),
+        },
+      }),
+    ),
   updateRoute: (id, patch) =>
     set((s) =>
       withHistory(s, {

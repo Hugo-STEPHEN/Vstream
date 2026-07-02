@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Footprints, Forklift, Grid3X3, ImagePlus, MousePointer2, Pentagon, Route as RouteIcon,
-  Square, Trash2, Bot, X,
+  Ruler, Square, Trash2, Bot, X,
 } from 'lucide-react'
 import { useApp } from '../../store'
 import { isProcessKind } from '../../lib/analytics'
@@ -43,6 +43,8 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
   const containerRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState({ x: 0, y: 0, k: 1 })
   const [gridOpen, setGridOpen] = useState(false)
+  const [calib, setCalib] = useState<{ a: { x: number; y: number }; b?: { x: number; y: number } } | null>(null)
+  const [calibMeters, setCalibMeters] = useState('10')
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
   const [zoneDraft, setZoneDraft] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
   const dragZone = useRef<{ id: string; dx: number; dy: number; moved: boolean } | null>(null)
@@ -61,6 +63,11 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
   useEffect(() => {
     fitView()
   }, [fitView])
+
+  // Drop the calibration line whenever we leave the ruler tool.
+  useEffect(() => {
+    if (tool !== 'calibrate') setCalib(null)
+  }, [tool])
 
   const toWorld = (e: React.PointerEvent | React.MouseEvent): { x: number; y: number } => {
     const svg = svgRef.current
@@ -91,6 +98,11 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
     }
     if (tool === 'poly') {
       useApp.getState().pushDraftPolyPoint(w.x, w.y)
+      return
+    }
+    if (tool === 'calibrate') {
+      if (!calib || calib.b) setCalib({ a: w })
+      else setCalib({ a: calib.a, b: w })
       return
     }
     if (tool === 'zone') {
@@ -150,10 +162,17 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
       const w = Math.abs(zoneDraft.x1 - zoneDraft.x0)
       const h = Math.abs(zoneDraft.y1 - zoneDraft.y0)
       if (w > 24 && h > 24) {
+        // Store rectangles as 4-vertex polygons so every zone is vertex-editable.
         useApp.getState().addZone({
           name: `Zone ${spaghetti.zones.length + 1}`,
           x, y, w, h,
           color: '#94A3B8',
+          points: [
+            { x, y },
+            { x: x + w, y },
+            { x: x + w, y: y + h },
+            { x, y: y + h },
+          ],
         })
       }
       setZoneDraft(null)
@@ -184,6 +203,9 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
           </ToolButton>
           <ToolButton active={tool === 'route'} onClick={() => useApp.getState().setSpaghettiTool('route')} title={t('floor.routeHint')}>
             <RouteIcon size={13} /> {t('floor.route')}
+          </ToolButton>
+          <ToolButton active={tool === 'calibrate'} onClick={() => { setCalib(null); useApp.getState().setSpaghettiTool('calibrate') }} title={t('floor.calibrateHint')}>
+            <Ruler size={13} /> {t('floor.calibrate')}
           </ToolButton>
           <div className="mx-2 h-5 w-px bg-edge" />
           {(Object.keys(profiles) as TransportMode[]).map((m) => {
@@ -278,21 +300,38 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
               </g>
             ))}
 
-            {/* Draggable vertices of the selected polygon zone */}
-            {tool === 'select' && selectedZone?.points && selectedZone.points.map((pt, i) => (
-              <circle
-                key={`${selectedZone.id}-v-${i}`}
-                cx={pt.x} cy={pt.y} r={7}
-                fill="#0B0F19" stroke="#22D3EE" strokeWidth={2}
-                className="cursor-move"
-                onPointerDown={(e) => {
-                  if (e.button !== 0) return
-                  e.stopPropagation()
-                  dragZonePt.current = { zoneId: selectedZone.id, index: i, moved: false }
-                  ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
-                }}
-              />
-            ))}
+            {/* Vertex handles of the selected polygon zone: drag to move,
+                alt/right-click to remove, and "+" midpoints to insert. */}
+            {tool === 'select' && selectedZone?.points && (
+              <g>
+                {selectedZone.points.map((pt, i) => {
+                  const next = selectedZone.points![(i + 1) % selectedZone.points!.length]
+                  const mid = { x: (pt.x + next.x) / 2, y: (pt.y + next.y) / 2 }
+                  return (
+                    <g key={`${selectedZone.id}-v-${i}`}>
+                      <circle cx={mid.x} cy={mid.y} r={5} fill="#0B0F19" stroke="#34D399" strokeWidth={1.5}
+                        className="cursor-copy"
+                        onPointerDown={(e) => {
+                          if (e.button !== 0) return
+                          e.stopPropagation()
+                          useApp.getState().insertZonePoint(selectedZone.id, i, mid.x, mid.y)
+                        }} />
+                      <text x={mid.x} y={mid.y + 3} textAnchor="middle" fill="#34D399" fontSize={8} pointerEvents="none">+</text>
+                      <circle cx={pt.x} cy={pt.y} r={7} fill="#0B0F19" stroke="#22D3EE" strokeWidth={2}
+                        className="cursor-move"
+                        onContextMenu={(e) => { e.preventDefault(); useApp.getState().removeZonePoint(selectedZone.id, i) }}
+                        onPointerDown={(e) => {
+                          if (e.button !== 0) return
+                          e.stopPropagation()
+                          if (e.altKey) { useApp.getState().removeZonePoint(selectedZone.id, i); return }
+                          dragZonePt.current = { zoneId: selectedZone.id, index: i, moved: false }
+                          ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+                        }} />
+                    </g>
+                  )
+                })}
+              </g>
+            )}
 
             {spaghetti.routes.map((r) => {
               const p = profiles[r.mode]
@@ -317,21 +356,56 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
               )
             })}
 
-            {/* Draggable waypoints of the selected route */}
-            {tool === 'select' && selectedRoute && selectedRoute.points.map((pt, i) => (
-              <circle
-                key={`${selectedRoute.id}-pt-${i}`}
-                cx={pt.x} cy={pt.y} r={7}
-                fill="#0B0F19" stroke="#22D3EE" strokeWidth={2}
-                className="cursor-move"
-                onPointerDown={(e) => {
-                  if (e.button !== 0) return
-                  e.stopPropagation()
-                  dragPoint.current = { routeId: selectedRoute.id, index: i, moved: false }
-                  ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
-                }}
-              />
-            ))}
+            {/* Route waypoints: drag to move, alt/right-click to remove,
+                "+" midpoints to insert a new waypoint. */}
+            {tool === 'select' && selectedRoute && (
+              <g>
+                {selectedRoute.points.slice(0, -1).map((pt, i) => {
+                  const next = selectedRoute.points[i + 1]
+                  const mid = { x: (pt.x + next.x) / 2, y: (pt.y + next.y) / 2 }
+                  return (
+                    <g key={`${selectedRoute.id}-mid-${i}`}>
+                      <circle cx={mid.x} cy={mid.y} r={5} fill="#0B0F19" stroke="#34D399" strokeWidth={1.5}
+                        className="cursor-copy"
+                        onPointerDown={(e) => {
+                          if (e.button !== 0) return
+                          e.stopPropagation()
+                          useApp.getState().insertRoutePoint(selectedRoute.id, i, mid.x, mid.y)
+                        }} />
+                      <text x={mid.x} y={mid.y + 3} textAnchor="middle" fill="#34D399" fontSize={8} pointerEvents="none">+</text>
+                    </g>
+                  )
+                })}
+                {selectedRoute.points.map((pt, i) => (
+                  <circle key={`${selectedRoute.id}-pt-${i}`} cx={pt.x} cy={pt.y} r={7}
+                    fill="#0B0F19" stroke="#22D3EE" strokeWidth={2} className="cursor-move"
+                    onContextMenu={(e) => { e.preventDefault(); useApp.getState().removeRoutePoint(selectedRoute.id, i) }}
+                    onPointerDown={(e) => {
+                      if (e.button !== 0) return
+                      e.stopPropagation()
+                      if (e.altKey) { useApp.getState().removeRoutePoint(selectedRoute.id, i); return }
+                      dragPoint.current = { routeId: selectedRoute.id, index: i, moved: false }
+                      ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+                    }} />
+                ))}
+              </g>
+            )}
+
+            {/* Calibration ruler line */}
+            {calib && (
+              <g pointerEvents="none">
+                {(() => {
+                  const b = calib.b ?? hover ?? calib.a
+                  return (
+                    <>
+                      <line x1={calib.a.x} y1={calib.a.y} x2={b.x} y2={b.y} stroke="#F472B6" strokeWidth={2} />
+                      <circle cx={calib.a.x} cy={calib.a.y} r={4} fill="#F472B6" />
+                      <circle cx={b.x} cy={b.y} r={4} fill="#F472B6" />
+                    </>
+                  )
+                })()}
+              </g>
+            )}
 
             {draft.length > 0 && (
               <g pointerEvents="none">
@@ -382,6 +456,36 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
               </label>
               <NumberField label={t('canvas.gridStep')} unit="units" value={prefs.floorGridStep} min={10} max={200} step={10}
                 onChange={(floorGridStep) => useApp.getState().setPrefs({ floorGridStep })} />
+            </div>
+          )}
+
+          {/* Calibration prompt: enter the real length of the drawn line */}
+          {tool === 'calibrate' && calib?.b && (
+            <div className="panel absolute left-1/2 top-3 w-64 -translate-x-1/2 space-y-2 p-3">
+              <div className="field-label">{t('floor.calibrate')}</div>
+              <p className="text-[10.5px] leading-relaxed text-slate-400">{t('floor.calibratePrompt')}</p>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number" autoFocus min={0.01} step={0.1}
+                  className="w-full rounded-md border border-edge bg-ink px-2 py-1 font-mono text-sm text-slate-100 focus:border-flow/70 focus:outline-none"
+                  value={calibMeters}
+                  onChange={(e) => setCalibMeters(e.target.value)}
+                />
+                <span className="text-xs text-slate-400">m</span>
+              </div>
+              <div className="flex gap-1.5">
+                <button className="btn-ghost flex-1 !text-flow hover:!border-flow/50"
+                  onClick={() => {
+                    const meters = parseFloat(calibMeters)
+                    const px = Math.hypot(calib.b!.x - calib.a.x, calib.b!.y - calib.a.y)
+                    if (meters > 0 && px > 1) useApp.getState().setMetersPerUnit(meters / px)
+                    setCalib(null)
+                    useApp.getState().setSpaghettiTool('select')
+                  }}>
+                  {t('ana.apply')}
+                </button>
+                <button className="btn-ghost" onClick={() => setCalib(null)}>{t('floor.recalibrate')}</button>
+              </div>
             </div>
           )}
         </div>
@@ -476,8 +580,19 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
         ) : (
           <>
             <Section title={t('floor.plantScale')}>
-              <NumberField label={t('floor.metersPerUnit')} unit="m" value={spaghetti.metersPerUnit} min={0.01} max={2} step={0.01}
-                onChange={(v) => useApp.getState().setMetersPerUnit(v)} />
+              <button
+                className="btn-ghost flex w-full items-center justify-center gap-1.5 !text-flow hover:!border-flow/50"
+                onClick={() => { setCalib(null); useApp.getState().setSpaghettiTool('calibrate') }}
+              >
+                <Ruler size={13} /> {t('floor.calibrateDraw')}
+              </button>
+              <div className="panel flex items-center justify-between bg-ink px-3 py-2">
+                <span className="text-xs text-slate-400">{t('floor.currentScale')}</span>
+                <span className="font-mono text-sm text-flow">
+                  {(spaghetti.metersPerUnit * prefs.floorGridStep).toFixed(2)} m / {prefs.floorGridStep} u
+                </span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-slate-500">{t('floor.calibrateExplain')}</p>
               <p className="text-[11px] leading-relaxed text-slate-500">{t('floor.plantHint')}</p>
             </Section>
             <FloorPlanPanel />
