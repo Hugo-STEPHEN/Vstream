@@ -42,6 +42,8 @@ export interface ViewPrefs {
   floorGrid: boolean
   /** Floor grid step, canvas units. */
   floorGridStep: number
+  /** Show each object's snap anchor point. */
+  showAnchors: boolean
 }
 
 const DEFAULT_PREFS: ViewPrefs = {
@@ -50,6 +52,7 @@ const DEFAULT_PREFS: ViewPrefs = {
   snapStep: 20,
   floorGrid: true,
   floorGridStep: 50,
+  showAnchors: false,
 }
 
 function loadPrefs(): ViewPrefs {

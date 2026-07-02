@@ -232,6 +232,11 @@ export function VsmCanvas({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }
               onChange={(e) => useApp.getState().setPrefs({ vsmSnap: e.target.checked })} />
             {t('canvas.gridSnap')}
           </label>
+          <label className="flex items-center gap-2 text-xs text-slate-300">
+            <input type="checkbox" className="accent-cyan-400" checked={prefs.showAnchors}
+              onChange={(e) => useApp.getState().setPrefs({ showAnchors: e.target.checked })} />
+            {t('canvas.showAnchors')}
+          </label>
           <NumberField label={t('canvas.gridStep')} unit="units" value={prefs.snapStep} min={5} max={100} step={5}
             onChange={(snapStep) => useApp.getState().setPrefs({ snapStep })} />
         </div>
@@ -377,11 +382,13 @@ function NodeShape({
   isConnectSource: boolean
   onPointerDown: (e: React.PointerEvent, node: VsmNode) => void
 }) {
-  const { t } = useT()
+  const { lang, t } = useT()
+  const showAnchors = useApp((s) => s.prefs.showAnchors)
   const pm = metrics.processes.find((p) => p.nodeId === node.id)
   const im = metrics.inventories.find((i) => i.nodeId === node.id)
   const isBottleneck = metrics.bottleneck?.nodeId === node.id && metrics.processes.length > 1
   const overTakt = pm?.exceedsTakt ?? false
+  const isProc = isProcessKind(node.kind)
 
   const color = overTakt
     ? '#F87171'
@@ -392,6 +399,10 @@ function NodeShape({
         : node.color ??
           (NODE_LANE[node.kind] === 'information' ? '#818CF8' : '#94A3B8')
 
+  // Process nodes render as a full VSM data box; other kinds keep the glyph.
+  const boxW = isProc ? DATABOX_W : NODE_W
+  const boxH = isProc ? DATABOX_H : NODE_H
+
   return (
     <g
       transform={`translate(${node.x} ${node.y})`}
@@ -399,62 +410,161 @@ function NodeShape({
       onPointerDown={(e) => onPointerDown(e, node)}
       onDoubleClick={(e) => {
         e.stopPropagation()
-        if (isProcessKind(node.kind)) useApp.getState().openStationDetail(node.id)
+        if (isProc) useApp.getState().openStationDetail(node.id)
       }}
       className={connecting ? 'cursor-crosshair' : 'cursor-grab'}
     >
       {(selected || isConnectSource) && (
-        <rect x={-NODE_W / 2 - 6} y={-NODE_H / 2 - 6} width={NODE_W + 12} height={NODE_H + 12} rx={8}
+        <rect x={-boxW / 2 - 6} y={-boxH / 2 - 6} width={boxW + 12} height={boxH + 12} rx={8}
           fill="none" stroke="#22D3EE" strokeWidth={1.2} strokeDasharray="4 3" opacity={0.9} />
       )}
       {overTakt && (
-        <rect x={-NODE_W / 2 - 4} y={-NODE_H / 2 - 4} width={NODE_W + 8} height={NODE_H + 8} rx={7}
+        <rect x={-boxW / 2 - 4} y={-boxH / 2 - 4} width={boxW + 8} height={boxH + 8} rx={7}
           fill="none" stroke="#F87171" strokeWidth={2}>
           <animate attributeName="opacity" values="1;0.25;1" dur="1.3s" repeatCount="indefinite" />
         </rect>
       )}
-      {/* generous invisible hit area */}
-      <rect x={-NODE_W / 2} y={-NODE_H / 2} width={NODE_W} height={NODE_H} fill="transparent" />
 
-      <g transform="translate(0 -4)">
-        <NodeGlyph kind={node.kind} />
-      </g>
-
-      <text x={0} y={-NODE_H / 2 - 10} textAnchor="middle" fill="#E2E8F0" fontSize={12.5} fontFamily={DISPLAY} fontWeight={600}>
-        {node.label}
-      </text>
-
-      {pm ? (
-        <g fontFamily={MONO} fontSize={9.5}>
-          <text x={0} y={NODE_H / 2 + 14} textAnchor="middle" fill="#94A3B8">
-            {`CT ${fmtSeconds(pm.ctNominal)} · A ${(pm.availability * 100).toFixed(0)}% · SR ${(pm.scrap * 100).toFixed(1)}%`}
+      {isProc && pm ? (
+        <ProcessDataBox node={node} pm={pm} color={color} overTakt={overTakt} lang={lang} />
+      ) : (
+        <>
+          {/* generous invisible hit area */}
+          <rect x={-NODE_W / 2} y={-NODE_H / 2} width={NODE_W} height={NODE_H} fill="transparent" />
+          <g transform="translate(0 -4)">
+            <NodeGlyph kind={node.kind} />
+          </g>
+          <text x={0} y={-NODE_H / 2 - 10} textAnchor="middle" fill="#E2E8F0" fontSize={12.5} fontFamily={DISPLAY} fontWeight={600}>
+            {node.label}
           </text>
-          <text x={0} y={NODE_H / 2 + 27} textAnchor="middle" fill={overTakt ? '#F87171' : '#64748B'}>
-            {`CT* ${fmtSeconds(pm.ctGrand)} · ${pm.operators.toFixed(1)} FTE${pm.smedAlert ? ' · SMED!' : ''}`}
-          </text>
-        </g>
-      ) : null}
-      {im ? (
-        <text x={0} y={NODE_H / 2 + 14} textAnchor="middle" fill="#94A3B8" fontFamily={MONO} fontSize={9.5}>
-          {`${im.qty.toLocaleString()} pcs · ${im.days.toFixed(1)} d`}
-        </text>
-      ) : null}
-      {node.kind === 'truck' || node.kind === 'ship' || node.kind === 'air' ? (
-        <text x={0} y={NODE_H / 2 + 14} textAnchor="middle" fill="#94A3B8" fontFamily={MONO} fontSize={9.5}>
-          {`${node.tripsPerWeek ?? 0}×/wk · ${node.distanceKm ?? 0} km`}
-        </text>
-      ) : null}
+          {im ? (
+            <text x={0} y={NODE_H / 2 + 14} textAnchor="middle" fill="#94A3B8" fontFamily={MONO} fontSize={9.5}>
+              {`${im.qty.toLocaleString()} pcs · ${im.days.toFixed(1)} d`}
+            </text>
+          ) : null}
+          {node.kind === 'truck' || node.kind === 'ship' || node.kind === 'air' ? (
+            <text x={0} y={NODE_H / 2 + 14} textAnchor="middle" fill="#94A3B8" fontFamily={MONO} fontSize={9.5}>
+              {`${node.tripsPerWeek ?? 0}×/wk · ${node.distanceKm ?? 0} km`}
+            </text>
+          ) : null}
+        </>
+      )}
+
       {isBottleneck && !overTakt ? (
-        <text x={0} y={-NODE_H / 2 - 26} textAnchor="middle" fill="#FBBF24" fontFamily={MONO} fontSize={9}>
+        <text x={0} y={-boxH / 2 - 12} textAnchor="middle" fill="#FBBF24" fontFamily={MONO} fontSize={9}>
           {t('canvas.bottleneck')}
         </text>
       ) : null}
       {overTakt ? (
-        <text x={0} y={-NODE_H / 2 - 26} textAnchor="middle" fill="#F87171" fontFamily={MONO} fontSize={9}>
+        <text x={0} y={-boxH / 2 - 12} textAnchor="middle" fill="#F87171" fontFamily={MONO} fontSize={9}>
           {t('canvas.overTakt')}
         </text>
       ) : null}
+
+      {/* Anchor point — where the node snaps on the grid */}
+      {showAnchors && <AnchorMark />}
     </g>
+  )
+}
+
+// VSM data-box dimensions (process nodes).
+const DATABOX_W = 138
+const DATABOX_H = 108
+
+/** A snap anchor marker (small crosshair at the object's centre). */
+function AnchorMark() {
+  return (
+    <g pointerEvents="none">
+      <circle cx={0} cy={0} r={2.5} fill="#22D3EE" />
+      <circle cx={0} cy={0} r={6} fill="none" stroke="#22D3EE" strokeWidth={0.8} opacity={0.6} />
+      <line x1={-9} y1={0} x2={9} y2={0} stroke="#22D3EE" strokeWidth={0.6} opacity={0.5} />
+      <line x1={0} y1={-9} x2={0} y2={9} stroke="#22D3EE" strokeWidth={0.6} opacity={0.5} />
+    </g>
+  )
+}
+
+/**
+ * Classic "Learning to See" data box: the process name on top, a 2-column grid
+ * of the station's parameters, and a footer with the grand cycle time and TRS.
+ */
+function ProcessDataBox({
+  node,
+  pm,
+  color,
+  overTakt,
+  lang,
+}: {
+  node: VsmNode
+  pm: SystemMetrics['processes'][number]
+  color: string
+  overTakt: boolean
+  lang: 'en' | 'fr'
+}) {
+  const w = DATABOX_W
+  const h = DATABOX_H
+  const left = -w / 2
+  const top = -h / 2
+  const headerH = 26
+  const footerH = 22
+  const gridTop = top + headerH
+  const gridH = h - headerH - footerH
+  const rowH = gridH / 3
+  const L = (en: string, fr: string) => (lang === 'fr' ? fr : en)
+
+  // Two columns of the three most useful rows each.
+  const colLeft: [string, string][] = [
+    ['C/T', fmtSeconds(pm.ctNominal)],
+    ['C/O', fmtSeconds(pm.setup)],
+    [L('Batch', 'Lot'), String(pm.batch)],
+  ]
+  const colRight: [string, string][] = [
+    [L('Avail', 'Dispo'), `${(pm.availability * 100).toFixed(0)}%`],
+    [L('Scrap', 'Rebut'), `${(pm.scrap * 100).toFixed(1)}%`],
+    [L('OEE', 'TRS'), `${(pm.trs * 100).toFixed(0)}%`],
+  ]
+
+  const cell = (col: [string, string][], cx: number) =>
+    col.map(([label, value], i) => {
+      const cy = gridTop + rowH * i + rowH / 2
+      return (
+        <g key={label} fontFamily={MONO}>
+          <text x={cx} y={cy - 1} fill="#64748B" fontSize={7.5} letterSpacing={0.3}>{label}</text>
+          <text x={cx} y={cy + 9} fill="#E2E8F0" fontSize={10}>{value}</text>
+        </g>
+      )
+    })
+
+  return (
+    <>
+      {/* box */}
+      <rect x={left} y={top} width={w} height={h} rx={6} fill="#0B0F19" stroke={color} strokeWidth={1.5} />
+      {/* header */}
+      <rect x={left} y={top} width={w} height={headerH} rx={6} fill={color} fillOpacity={0.14} />
+      <rect x={left} y={top + headerH - 6} width={w} height={6} fill={color} fillOpacity={0.14} />
+      <line x1={left} y1={top + headerH} x2={left + w} y2={top + headerH} stroke={color} strokeOpacity={0.35} strokeWidth={1} />
+      <text x={0} y={top + 17} textAnchor="middle" fill="#E2E8F0" fontFamily={DISPLAY} fontSize={11.5} fontWeight={600}>
+        {truncate(node.label, 18)}
+      </text>
+      {/* operator badge (top-right) */}
+      {pm.operators > 0 && (
+        <g transform={`translate(${w / 2 - 16} ${top + 13})`}>
+          <circle r={8} fill="#0B0F19" stroke={color} strokeWidth={0.8} />
+          <text x={0} y={3} textAnchor="middle" fill="#94A3B8" fontFamily={MONO} fontSize={8}>{pm.operators}</text>
+        </g>
+      )}
+      {/* column divider */}
+      <line x1={0} y1={gridTop} x2={0} y2={gridTop + gridH} stroke="#1E293B" strokeWidth={1} />
+      {cell(colLeft, left + 10)}
+      {cell(colRight, 10)}
+      {/* footer: grand CT + flags */}
+      <line x1={left} y1={top + h - footerH} x2={left + w} y2={top + h - footerH} stroke="#1E293B" strokeWidth={1} />
+      <text x={left + 8} y={top + h - 7} fill={overTakt ? '#F87171' : '#34D399'} fontFamily={MONO} fontSize={9.5}>
+        CT* {fmtSeconds(pm.ctGrand)}
+      </text>
+      <text x={left + w - 8} y={top + h - 7} textAnchor="end" fill={overTakt ? '#F87171' : '#64748B'} fontFamily={MONO} fontSize={9}>
+        {`${Math.round(pm.taktUtilization * 100)}% takt${pm.smedAlert ? ' · SMED' : ''}`}
+      </text>
+    </>
   )
 }
 
@@ -510,6 +620,7 @@ function AnnotationShape({
   const h = node.h ?? 110
   const color = node.color ?? '#FBBF24'
   const text = node.note ?? ''
+  const showAnchors = useApp((s) => s.prefs.showAnchors)
   const openDetail = (e: React.MouseEvent) => {
     e.stopPropagation()
     useApp.getState().selectNode(node.id)
@@ -576,6 +687,7 @@ function AnnotationShape({
           )}
         </>
       )}
+      {showAnchors && <AnchorMark />}
     </g>
   )
 }

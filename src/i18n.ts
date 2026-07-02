@@ -126,6 +126,7 @@ const STRINGS = {
   'canvas.gridSnap': { en: 'Snap nodes to grid', fr: 'Aimanter les nœuds à la grille' },
   'canvas.gridStep': { en: 'Snap step', fr: 'Pas de grille' },
   'canvas.gridSettings': { en: 'Grid & snapping', fr: 'Grille & aimantation' },
+  'canvas.showAnchors': { en: 'Show anchor points', fr: 'Afficher les points d’ancrage' },
   'canvas.laneInfo': { en: 'INFORMATION FLOW', fr: 'FLUX D’INFORMATION' },
   'canvas.laneMaterial': { en: 'MATERIAL FLOW', fr: 'FLUX MATIÈRE' },
   'canvas.laneTimeline': { en: 'TIMELINE LADDER — VA / NVA', fr: 'ÉCHELLE DES TEMPS — VA / NVA' },
