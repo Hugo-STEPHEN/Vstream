@@ -40,8 +40,23 @@ apparaît alors dans l'**audit transport** (onglet Analyse des flux) en
 cycle du poste. Le transport est du muda pur : ce pont rend ce gaspillage visible
 à côté de la production.
 
+## Circuits opérateur → temps de production
+
+Un trajet lié à un poste peut être coché **« Circuit opérateur »**, avec un but :
+livrer la production à l'étape suivante, chercher l'information (quoi produire),
+ou naviguer entre les étapes. Son **temps de marche est alors imputé au temps
+disponible du poste lié** : pendant que l'opérateur marche, le poste ne produit
+pas.
+
+L'effet traverse tout le modèle — il baisse le TRS du poste, sa capacité, et donc
+le flux entier. Dans l'**analyse des taux**, le circuit apparaît comme une étape
+rose « Opérateur présent » dans la cascade et comme une barre dans le Pareto des
+pertes (souvent la plus grande !). C'est le pont concret entre l'implantation
+physique et la performance : raccourcir un trajet ou changer son mode se traduit
+directement en points de TRS et en capacité.
+
 ## En cours d'évolution
 
 L'étalonnage de l'échelle « au trait » (tracer une ligne de longueur connue) et
-l'impact des circuits opérateur sur le temps disponible sont des chantiers
-prévus — voir la feuille de route dans le README.
+l'ajout/suppression de sommets de polygone sont des chantiers prévus — voir la
+feuille de route dans le README.

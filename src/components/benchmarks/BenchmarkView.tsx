@@ -3,8 +3,8 @@ import {
   PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer, Legend,
 } from 'recharts'
 import { useApp } from '../../store'
-import { computeSystemMetrics } from '../../lib/analytics'
 import { BENCHMARK_META, computeBenchmarks, overallGrade } from '../../lib/benchmarks'
+import { useSystemMetrics } from '../../lib/useMetrics'
 import { Section } from '../ui'
 import { useT } from '../../i18n'
 
@@ -13,7 +13,7 @@ export function BenchmarkView() {
   const nodes = useApp((s) => s.nodes)
   const demand = useApp((s) => s.demand)
   const calibration = useApp((s) => s.calibration)
-  const metrics = useMemo(() => computeSystemMetrics(nodes, demand, calibration), [nodes, demand, calibration])
+  const metrics = useSystemMetrics()
   const rows = useMemo(() => computeBenchmarks(metrics, calibration), [metrics, calibration])
   const grade = overallGrade(rows)
 

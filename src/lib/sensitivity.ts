@@ -103,6 +103,7 @@ export function sweepSensitivity(
   param: SweepParam,
   steps = 25,
   cal: CalibrationConfig = DEFAULT_CALIBRATION,
+  circuits?: ReadonlyMap<string, number>,
 ): SweepResult | null {
   const def = SWEEP_PARAM_BY_KEY.get(param)
   const node = nodes.find((n) => n.id === nodeId)
@@ -113,7 +114,7 @@ export function sweepSensitivity(
   for (let i = 0; i < steps; i++) {
     const value = min + ((max - min) * i) / (steps - 1)
     const clone = nodes.map((n) => (n.id === nodeId ? { ...n, ...def.write(value) } : n))
-    const m = computeSystemMetrics(clone, demand, cal)
+    const m = computeSystemMetrics(clone, demand, cal, circuits)
     const pm = m.processes.find((p) => p.nodeId === nodeId)
     points.push({
       value,

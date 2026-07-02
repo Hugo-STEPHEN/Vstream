@@ -28,6 +28,7 @@ export function generateKaizenSuggestions(
   demand: DemandConfig,
   base: SystemMetrics,
   cal: CalibrationConfig = DEFAULT_CALIBRATION,
+  circuits?: ReadonlyMap<string, number>,
 ): KaizenSuggestion[] {
   const out: KaizenSuggestion[] = []
 
@@ -39,7 +40,7 @@ export function generateKaizenSuggestions(
     patch: Partial<VsmNode>,
   ): void => {
     const clone = nodes.map((n) => (n.id === nodeId ? { ...n, ...patch } : { ...n }))
-    const after = computeSystemMetrics(clone, demand, cal)
+    const after = computeSystemMetrics(clone, demand, cal, circuits)
     const pceDelta = after.pce - base.pce
     const leadTimeDelta = after.leadTimeSeconds - base.leadTimeSeconds
     // Keep only countermeasures that actually move the system.

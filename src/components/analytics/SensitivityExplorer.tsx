@@ -5,6 +5,7 @@ import {
 import { useApp } from '../../store'
 import { isProcessKind } from '../../lib/analytics'
 import { SWEEP_PARAMS, SWEEP_PARAM_BY_KEY, sweepSensitivity, type SweepParam } from '../../lib/sensitivity'
+import { circuitSecondsByNode } from '../../lib/spaghetti'
 import { Section } from '../ui'
 import { useT } from '../../i18n'
 
@@ -18,6 +19,7 @@ export function SensitivityExplorer() {
   const nodes = useApp((s) => s.nodes)
   const demand = useApp((s) => s.demand)
   const calibration = useApp((s) => s.calibration)
+  const spaghetti = useApp((s) => s.spaghetti)
 
   const stations = useMemo(() => nodes.filter((n) => isProcessKind(n.kind)), [nodes])
   const [nodeId, setNodeId] = useState<string>('')
@@ -26,10 +28,11 @@ export function SensitivityExplorer() {
   const activeId = stations.some((n) => n.id === nodeId) ? nodeId : stations[0]?.id ?? ''
   const def = SWEEP_PARAM_BY_KEY.get(param)
 
-  const sweep = useMemo(
-    () => (activeId ? sweepSensitivity(nodes, demand, activeId, param, 25, calibration) : null),
-    [nodes, demand, activeId, param, calibration],
-  )
+  const sweep = useMemo(() => {
+    if (!activeId) return null
+    const circuits = circuitSecondsByNode(spaghetti, demand.shiftsPerDay, calibration)
+    return sweepSensitivity(nodes, demand, activeId, param, 25, calibration, circuits)
+  }, [nodes, demand, activeId, param, calibration, spaghetti])
 
   const data = useMemo(
     () =>

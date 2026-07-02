@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../../store'
 import { NODE_LANE } from '../../data/palette'
 import { SHEET, NODE_W, NODE_H } from '../../lib/geometry'
-import { computeSystemMetrics, fmtSeconds, isInventoryKind, isProcessKind } from '../../lib/analytics'
+import { fmtSeconds, isInventoryKind, isProcessKind } from '../../lib/analytics'
+import { useSystemMetrics } from '../../lib/useMetrics'
 import { Grid3X3 } from 'lucide-react'
 import { NumberField } from '../ui'
 import { NodeGlyph } from './NodeGlyph'
@@ -33,7 +34,7 @@ export function VsmCanvas({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }
   const prefs = useApp((s) => s.prefs)
   const [gridOpen, setGridOpen] = useState(false)
 
-  const metrics = useMemo(() => computeSystemMetrics(nodes, demand, calibration), [nodes, demand, calibration])
+  const metrics = useSystemMetrics()
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState<ViewTransform>({ x: 0, y: 0, k: 0.72 })

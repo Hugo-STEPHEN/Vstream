@@ -4,9 +4,10 @@ import {
 } from 'recharts'
 import { Check, Copy, Leaf, Microscope, Plug, Sparkles, Truck, Zap } from 'lucide-react'
 import { useApp } from '../../store'
-import { computeSystemMetrics, fmtSeconds } from '../../lib/analytics'
+import { fmtSeconds } from '../../lib/analytics'
+import { useSystemMetrics } from '../../lib/useMetrics'
 import { buildCopilotPrompt, generateKaizenSuggestions } from '../../lib/copilot'
-import { computeTransportAudit } from '../../lib/spaghetti'
+import { circuitSecondsByNode, computeTransportAudit } from '../../lib/spaghetti'
 import { Badge, Section, Stat } from '../ui'
 import { useT } from '../../i18n'
 import { ScenarioBar } from './ScenarioBar'
@@ -21,14 +22,18 @@ export function AnalyticsView() {
   const calibration = useApp((s) => s.calibration)
   const updateNode = useApp((s) => s.updateNode)
 
-  const metrics = useMemo(() => computeSystemMetrics(nodes, demand, calibration), [nodes, demand, calibration])
+  const metrics = useSystemMetrics()
   const transport = useMemo(
     () => computeTransportAudit(spaghetti, demand.unitsPerDay / Math.max(1, demand.shiftsPerDay), calibration),
     [spaghetti, demand.unitsPerDay, demand.shiftsPerDay, calibration],
   )
+  const circuits = useMemo(
+    () => circuitSecondsByNode(spaghetti, demand.shiftsPerDay, calibration),
+    [spaghetti, demand.shiftsPerDay, calibration],
+  )
   const suggestions = useMemo(
-    () => generateKaizenSuggestions(nodes, demand, metrics, calibration),
-    [nodes, demand, metrics, calibration],
+    () => generateKaizenSuggestions(nodes, demand, metrics, calibration, circuits),
+    [nodes, demand, metrics, calibration, circuits],
   )
 
   const chartData = metrics.processes.map((p) => ({

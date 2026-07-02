@@ -265,3 +265,45 @@ describe('TRS / TRG / TRE (NF E 60-182)', () => {
     expect(m.tre).toBeCloseTo(m.trs)
   })
 })
+
+describe('operator circuits (spaghetti → VSM)', () => {
+  it('charges circuit seconds against a station as availability loss', async () => {
+    const { computeProcessMetrics } = await import('./analytics')
+    const base = computeProcessMetrics(station, 120, 0.5, 0)
+    const withCircuit = computeProcessMetrics(station, 120, 0.5, 0.2)
+    // TRS drops by exactly the (1 - loss) factor on availability.
+    expect(withCircuit.trs).toBeCloseTo(base.trs * 0.8)
+    expect(withCircuit.circuitLoss).toBeCloseTo(0.2)
+    // Effective cycle time stretches, so grand CT grows.
+    expect(withCircuit.ctGrand).toBeGreaterThan(base.ctGrand)
+  })
+
+  it('circuitSecondsByNode sums only flagged, linked routes', async () => {
+    const { circuitSecondsByNode } = await import('./spaghetti')
+    const floor: SpaghettiState = {
+      metersPerUnit: 0.5,
+      zones: [],
+      routes: [
+        { id: 'a', name: 'A', mode: 'walk', tripsPerShift: 10, points: [{ x: 0, y: 0 }, { x: 100, y: 0 }], linkedNodeId: 'p1', operatorCircuit: true },
+        { id: 'b', name: 'B', mode: 'walk', tripsPerShift: 10, points: [{ x: 0, y: 0 }, { x: 100, y: 0 }], linkedNodeId: 'p1' }, // not a circuit
+        { id: 'c', name: 'C', mode: 'walk', tripsPerShift: 5, points: [{ x: 0, y: 0 }, { x: 100, y: 0 }], operatorCircuit: true }, // not linked
+      ],
+    }
+    const map = circuitSecondsByNode(floor, 2)
+    // route a: 50m ×2 ×10 = 1000 m/shift ÷ 1.2 m/s × 2 shifts
+    expect(map.get('p1')).toBeCloseTo((1000 / 1.2) * 2)
+    expect(map.size).toBe(1)
+  })
+
+  it('a linked operator circuit lowers the whole-system capacity', async () => {
+    const { circuitSecondsByNode } = await import('./spaghetti')
+    const nodes: VsmNode[] = [station]
+    const floor: SpaghettiState = {
+      metersPerUnit: 1, zones: [],
+      routes: [{ id: 'r', name: 'R', mode: 'walk', tripsPerShift: 60, points: [{ x: 0, y: 0 }, { x: 200, y: 0 }], linkedNodeId: 'p1', operatorCircuit: true }],
+    }
+    const noCircuit = computeSystemMetrics(nodes, demand)
+    const withCircuit = computeSystemMetrics(nodes, demand, undefined, circuitSecondsByNode(floor, demand.shiftsPerDay))
+    expect(withCircuit.systemCapacityPerDay).toBeLessThan(noCircuit.systemCapacityPerDay)
+  })
+})

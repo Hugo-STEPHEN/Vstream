@@ -158,6 +158,8 @@ export interface ProcessMetrics {
   opening: number
   /** 1 − scrap rate. */
   qualityRate: number
+  /** Fraction of available time lost to operator circuits (spaghetti), 0–0.9. */
+  circuitLoss: number
   /** TRS / OEE = availability × performance × quality (NF E 60-182). */
   trs: number
   /** TRG = TRS × engagement (good time ÷ opening time). */
@@ -253,6 +255,9 @@ export interface FloorZone {
   points?: { x: number; y: number }[]
 }
 
+/** Why an operator walks a circuit — all three steal time from production. */
+export type RoutePurpose = 'delivery' | 'info' | 'navigation'
+
 export interface TravelRoute {
   id: string
   name: string
@@ -262,6 +267,13 @@ export interface TravelRoute {
   tripsPerShift: number
   /** Optional link to the VSM station this route feeds — enables the transport audit. */
   linkedNodeId?: string
+  /**
+   * When true, this is an operator circuit whose travel time is charged against
+   * the linked station's available production time (it reduces capacity/TRS).
+   */
+  operatorCircuit?: boolean
+  /** What the circuit is for (delivery of production / info gathering / navigation). */
+  purpose?: RoutePurpose
 }
 
 /** Uploaded plant-floor drawing rendered under the grid. */

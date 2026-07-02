@@ -47,6 +47,7 @@ export function computeProcessMetrics(
   node: VsmNode,
   taktSeconds: number,
   smedFactor: number = DEFAULT_CALIBRATION.alerts.smedFactor,
+  circuitLoss = 0,
 ): ProcessMetrics {
   const ctNominal = Math.max(0, node.ct ?? 0)
   const availability = clamp(node.availability ?? 1, 0.1, 1)
@@ -56,16 +57,21 @@ export function computeProcessMetrics(
   const scrap = clamp(node.scrap ?? 0, 0, 0.95)
   const setup = Math.max(0, node.setup ?? 0)
   const batch = Math.max(1, node.batch ?? 1)
+  const loss = clamp(circuitLoss, 0, 0.9)
+
+  // Operator circuits (spaghetti) steal availability: while the operator walks a
+  // circuit, the station cannot run. This compounds with mechanical availability.
+  const availabilityEff = availability * (1 - loss)
 
   // Speed losses (allure) compound with availability in the effective CT.
-  const ctEffective = effectiveCycleTime(ctNominal, availability * performance)
+  const ctEffective = effectiveCycleTime(ctNominal, availabilityEff * performance)
   const ctQuality = qualityCycleTime(ctEffective, scrap)
   const setupPenalty = setupAmortization(setup, batch)
   const ctGrand = ctQuality + setupPenalty
 
   // NF E 60-182 rates: TRS (OEE) over required time, TRG over opening, TRE over total.
   const qualityRate = 1 - scrap
-  const trs = availability * performance * qualityRate
+  const trs = availabilityEff * performance * qualityRate
   const trg = trs * engagement
   const tre = trg * opening
 
@@ -90,6 +96,7 @@ export function computeProcessMetrics(
     scrap,
     setup,
     batch,
+    circuitLoss: loss,
     operators: Math.max(0, node.operators ?? 0),
     taktUtilization,
     exceedsTakt: taktSeconds > 0 && ctGrand > taktSeconds,
@@ -111,15 +118,24 @@ export function computeInventoryMetrics(node: VsmNode, demandPerDay: number, ava
   }
 }
 
-/** Full closed-loop system computation. Pure; re-runs on every state change. */
+/**
+ * Full closed-loop system computation. Pure; re-runs on every state change.
+ * `circuitSecondsByNode` (optional) charges operator-circuit travel seconds/day
+ * against each station's available time — see the spaghetti engine.
+ */
 export function computeSystemMetrics(
   nodes: VsmNode[],
   demand: DemandConfig,
   cal: CalibrationConfig = DEFAULT_CALIBRATION,
+  circuitSecondsByNode?: ReadonlyMap<string, number>,
 ): SystemMetrics {
   const availableSecondsPerDay = demand.shiftsPerDay * demand.netMinutesPerShift * 60
   const demandPerDay = Math.max(0, demand.unitsPerDay)
   const taktSeconds = demandPerDay > 0 ? availableSecondsPerDay / demandPerDay : 0
+  const circuitLossOf = (id: string): number =>
+    availableSecondsPerDay > 0 && circuitSecondsByNode
+      ? (circuitSecondsByNode.get(id) ?? 0) / availableSecondsPerDay
+      : 0
 
   // The timeline ladder walks the material lane left → right, the same way a
   // part flows on a classic VSM sheet.
@@ -133,7 +149,7 @@ export function computeSystemMetrics(
 
   for (const node of chain) {
     if (isProcessKind(node.kind)) {
-      const m = computeProcessMetrics(node, taktSeconds, cal.alerts.smedFactor)
+      const m = computeProcessMetrics(node, taktSeconds, cal.alerts.smedFactor, circuitLossOf(node.id))
       processes.push(m)
       ladder.push({
         type: 'va',
@@ -167,7 +183,7 @@ export function computeSystemMetrics(
   // ESG: a station is busy ctGrand seconds per part for every good part made.
   const kwhPerDay = nodes.reduce((s, n) => {
     if (!isProcessKind(n.kind) || !n.powerKw) return s
-    const m = computeProcessMetrics(n, taktSeconds, cal.alerts.smedFactor)
+    const m = computeProcessMetrics(n, taktSeconds, cal.alerts.smedFactor, circuitLossOf(n.id))
     const busyHoursPerDay = Math.min(
       (m.ctGrand * demandPerDay) / 3600,
       availableSecondsPerDay / 3600,

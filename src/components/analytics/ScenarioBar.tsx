@@ -3,6 +3,7 @@ import { Camera, CornerUpLeft, Trash2 } from 'lucide-react'
 import { useApp } from '../../store'
 import { computeSystemMetrics, fmtSeconds } from '../../lib/analytics'
 import { computeBenchmarks, overallGrade } from '../../lib/benchmarks'
+import { circuitSecondsByNode } from '../../lib/spaghetti'
 import { Badge, Section } from '../ui'
 import { useT } from '../../i18n'
 import type { CalibrationConfig, DemandConfig, SystemMetrics, VsmNode } from '../../types'
@@ -21,9 +22,10 @@ function row(
   nodes: VsmNode[],
   demand: DemandConfig,
   cal: CalibrationConfig,
+  circuits: ReadonlyMap<string, number>,
   savedAt?: string,
 ): ScenarioRow {
-  const metrics = computeSystemMetrics(nodes, demand, cal)
+  const metrics = computeSystemMetrics(nodes, demand, cal, circuits)
   return { id, name, savedAt, metrics, grade: overallGrade(computeBenchmarks(metrics, cal)).grade }
 }
 
@@ -38,15 +40,16 @@ export function ScenarioBar() {
   const demand = useApp((s) => s.demand)
   const scenarios = useApp((s) => s.scenarios)
   const calibration = useApp((s) => s.calibration)
+  const spaghetti = useApp((s) => s.spaghetti)
   const [name, setName] = useState('')
 
-  const rows = useMemo<ScenarioRow[]>(
-    () => [
-      row(null, t('ana.currentModel'), nodes, demand, calibration),
-      ...scenarios.map((sc) => row(sc.id, sc.name, sc.nodes, sc.demand, calibration, sc.savedAt)),
-    ],
-    [nodes, demand, scenarios, calibration, t],
-  )
+  const rows = useMemo<ScenarioRow[]>(() => {
+    const circuits = circuitSecondsByNode(spaghetti, demand.shiftsPerDay, calibration)
+    return [
+      row(null, t('ana.currentModel'), nodes, demand, calibration, circuits),
+      ...scenarios.map((sc) => row(sc.id, sc.name, sc.nodes, sc.demand, calibration, circuits, sc.savedAt)),
+    ]
+  }, [nodes, demand, scenarios, calibration, spaghetti, t])
   const base = rows[0].metrics
 
   const save = () => {

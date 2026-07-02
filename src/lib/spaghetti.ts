@@ -94,6 +94,29 @@ export function computeTransportAudit(
   }
 }
 
+/**
+ * Operator-circuit travel seconds per day, per linked VSM station. Only routes
+ * flagged `operatorCircuit` count. This map is fed to computeSystemMetrics so
+ * the walking time reduces each station's available production time.
+ */
+export function circuitSecondsByNode(
+  state: SpaghettiState,
+  shiftsPerDay: number,
+  cal: CalibrationConfig = DEFAULT_CALIBRATION,
+): Map<string, number> {
+  const profiles = transportProfiles(cal)
+  const out = new Map<string, number>()
+  for (const route of state.routes) {
+    if (!route.operatorCircuit || !route.linkedNodeId) continue
+    const profile = profiles[route.mode]
+    if (profile.speedMps <= 0) continue
+    const metersPerShift = polylineLength(route.points) * state.metersPerUnit * 2 * Math.max(0, route.tripsPerShift)
+    const secondsPerDay = (metersPerShift / profile.speedMps) * Math.max(1, shiftsPerDay)
+    out.set(route.linkedNodeId, (out.get(route.linkedNodeId) ?? 0) + secondsPerDay)
+  }
+  return out
+}
+
 export interface SpaghettiSummary {
   routes: RouteMetrics[]
   totalMetersPerShift: number

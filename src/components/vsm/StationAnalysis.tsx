@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { Gauge } from 'lucide-react'
 import { useApp } from '../../store'
-import { computeSystemMetrics, fmtSeconds, isProcessKind } from '../../lib/analytics'
+import { fmtSeconds, isProcessKind } from '../../lib/analytics'
+import { useSystemMetrics } from '../../lib/useMetrics'
 import { Badge, NumberField, Section } from '../ui'
 import { useT } from '../../i18n'
 import type { SystemMetrics } from '../../types'
@@ -22,7 +23,7 @@ export function StationAnalysisView() {
   const updateNode = useApp((s) => s.updateNode)
 
   const stations = useMemo(() => nodes.filter((n) => isProcessKind(n.kind)), [nodes])
-  const metrics = useMemo(() => computeSystemMetrics(nodes, demand, calibration), [nodes, demand, calibration])
+  const metrics = useSystemMetrics()
 
   const activeId = stations.some((n) => n.id === stationDetailId)
     ? (stationDetailId as string)
@@ -121,6 +122,7 @@ export function StationAnalysisView() {
           {m.exceedsTakt && <Badge tone="crit">OVER TAKT</Badge>}
           {metrics.bottleneck?.nodeId === m.nodeId && <Badge tone="warn">BOTTLENECK</Badge>}
           {m.smedAlert && <Badge tone="warn">SMED</Badge>}
+          {m.circuitLoss > 0 && <Badge tone="flow">{t('station.circuit')} −{(m.circuitLoss * 100).toFixed(0)}%</Badge>}
         </div>
         <RatePanel m={m} />
         <TimeCascade m={m} requiredSec={metrics.availableSecondsPerDay} />
@@ -162,7 +164,8 @@ function TimeCascade({ m, requiredSec }: { m: PM; requiredSec: number }) {
   const { t } = useT()
   const openingSec = m.engagement > 0 ? requiredSec / m.engagement : requiredSec
   const totalSec = m.opening > 0 ? openingSec / m.opening : openingSec
-  const runningSec = requiredSec * m.availability
+  const onFloorSec = requiredSec * (1 - m.circuitLoss) // operator present (not on a circuit)
+  const runningSec = onFloorSec * m.availability
   const netSec = runningSec * m.performance
   const usefulSec = netSec * m.qualityRate
   const maxSec = Math.max(1, totalSec)
@@ -171,6 +174,9 @@ function TimeCascade({ m, requiredSec }: { m: PM; requiredSec: number }) {
     { label: t('station.totalTime'), seconds: totalSec, color: '#334155' },
     { label: t('station.openingTime'), seconds: openingSec, rate: `× opening ${(m.opening * 100).toFixed(0)}%`, color: '#475569' },
     { label: t('station.requiredTime'), seconds: requiredSec, rate: `× engagement ${(m.engagement * 100).toFixed(0)}%`, color: '#64748B' },
+    ...(m.circuitLoss > 0
+      ? [{ label: t('station.onFloorTime'), seconds: onFloorSec, rate: `× ${t('station.circuit')} ${((1 - m.circuitLoss) * 100).toFixed(0)}%`, color: '#F472B6' }]
+      : []),
     { label: t('station.runningTime'), seconds: runningSec, rate: `× availability ${(m.availability * 100).toFixed(0)}%`, color: '#818CF8' },
     { label: t('station.netTime'), seconds: netSec, rate: `× performance ${(m.performance * 100).toFixed(0)}%`, color: '#22D3EE' },
     { label: t('station.usefulTime'), seconds: usefulSec, rate: `× quality ${(m.qualityRate * 100).toFixed(1)}%`, color: '#34D399' },
@@ -198,11 +204,14 @@ function TimeCascade({ m, requiredSec }: { m: PM; requiredSec: number }) {
 
 function LossPareto({ m, requiredSec }: { m: PM; requiredSec: number }) {
   const { t } = useT()
+  const avail = m.availability * (1 - m.circuitLoss)
   const downtime = requiredSec * (1 - m.availability)
-  const speed = requiredSec * m.availability * (1 - m.performance)
-  const quality = requiredSec * m.availability * m.performance * m.scrap
+  const circuit = requiredSec * m.availability * m.circuitLoss
+  const speed = requiredSec * avail * (1 - m.performance)
+  const quality = requiredSec * avail * m.performance * m.scrap
   const losses = [
     { label: t('station.downtime'), seconds: downtime, color: '#818CF8' },
+    ...(circuit > 0 ? [{ label: t('station.circuitLoss'), seconds: circuit, color: '#F472B6' }] : []),
     { label: t('station.speedLoss'), seconds: speed, color: '#22D3EE' },
     { label: t('station.defects'), seconds: quality, color: '#F87171' },
   ].sort((a, b) => b.seconds - a.seconds)

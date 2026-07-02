@@ -9,8 +9,8 @@ import { transportProfiles } from '../../lib/calibration'
 import { polygonArea } from '../../lib/geometry'
 import { computeSpaghettiSummary, computeTransportAudit, fmtMoney } from '../../lib/spaghetti'
 import { NumberField, Section, Stat, TextField } from '../ui'
-import { useT } from '../../i18n'
-import type { TransportMode } from '../../types'
+import { useT, type StringKey } from '../../i18n'
+import type { RoutePurpose, TransportMode, TravelRoute } from '../../types'
 
 export const FLOOR = { width: 1400, height: 720 } as const
 const MONO = 'JetBrains Mono, monospace'
@@ -428,6 +428,7 @@ export function SpaghettiStudio({ svgRef }: { svgRef: React.RefObject<SVGSVGElem
             <NumberField label={t('floor.roundTrips')} unit="/shift" value={selectedRoute.tripsPerShift} min={0} max={200} step={1} slider
               onChange={(tripsPerShift) => useApp.getState().updateRoute(selectedRoute.id, { tripsPerShift })} />
             <RouteLink routeId={selectedRoute.id} linkedNodeId={selectedRoute.linkedNodeId} />
+            <CircuitControls route={selectedRoute} />
             <RouteReadout routeId={selectedRoute.id} />
             <p className="text-[10px] leading-relaxed text-slate-500">
               {t('floor.dragHandles')}
@@ -532,6 +533,45 @@ function ToolButton({ active, onClick, title, children }: {
     >
       {children}
     </button>
+  )
+}
+
+const PURPOSE_KEY: Record<RoutePurpose, StringKey> = {
+  delivery: 'floor.purpose.delivery',
+  info: 'floor.purpose.info',
+  navigation: 'floor.purpose.navigation',
+}
+
+/** Toggle whether a linked route is an operator circuit that eats production time. */
+function CircuitControls({ route }: { route: TravelRoute }) {
+  const { t } = useT()
+  if (!route.linkedNodeId) return null
+  return (
+    <div className="space-y-1.5 rounded-md border border-edge bg-ink p-2">
+      <label className="flex items-center gap-2 text-xs text-slate-300">
+        <input
+          type="checkbox"
+          className="accent-cyan-400"
+          checked={route.operatorCircuit ?? false}
+          onChange={(e) => useApp.getState().updateRoute(route.id, { operatorCircuit: e.target.checked })}
+        />
+        {t('floor.operatorCircuit')}
+      </label>
+      {route.operatorCircuit && (
+        <>
+          <select
+            className="select-mini w-full !py-1.5"
+            value={route.purpose ?? 'delivery'}
+            onChange={(e) => useApp.getState().updateRoute(route.id, { purpose: e.target.value as RoutePurpose })}
+          >
+            {(['delivery', 'info', 'navigation'] as RoutePurpose[]).map((p) => (
+              <option key={p} value={p}>{t(PURPOSE_KEY[p])}</option>
+            ))}
+          </select>
+          <p className="text-[10px] leading-relaxed text-slate-500">{t('floor.circuitHint')}</p>
+        </>
+      )}
+    </div>
   )
 }
 

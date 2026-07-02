@@ -7,6 +7,8 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useApp, type AppTab } from './store'
 import { useT, type StringKey } from './i18n'
 import { computeSystemMetrics, fmtSeconds } from './lib/analytics'
+import { useSystemMetrics } from './lib/useMetrics'
+import { circuitSecondsByNode } from './lib/spaghetti'
 import {
   exportBenchmarksCsv, exportMetricsCsv, exportPng, exportProjectJson, exportSpaghettiCsv, exportSvg,
 } from './lib/exporters'
@@ -44,7 +46,7 @@ export default function App() {
   const past = useApp((s) => s.past)
   const future = useApp((s) => s.future)
 
-  const metrics = useMemo(() => computeSystemMetrics(nodes, demand, calibration), [nodes, demand, calibration])
+  const metrics = useSystemMetrics()
   const vsmSvgRef = useRef<SVGSVGElement>(null)
   const floorSvgRef = useRef<SVGSVGElement>(null)
 
@@ -133,8 +135,9 @@ function TopBar({
   const doExport = (what: 'report' | 'json' | 'csv' | 'csv-floor' | 'csv-bench' | 'svg' | 'png') => {
     const s = useApp.getState()
     const name = s.projectName.replace(/\s+/g, '_')
+    const circuits = circuitSecondsByNode(s.spaghetti, s.demand.shiftsPerDay, s.calibration)
     if (what === 'report') {
-      const metrics = computeSystemMetrics(s.nodes, s.demand, s.calibration)
+      const metrics = computeSystemMetrics(s.nodes, s.demand, s.calibration, circuits)
       const benchmarks = computeBenchmarks(metrics, s.calibration)
       exportHtmlReport({
         project: s.snapshot(),
@@ -148,11 +151,11 @@ function TopBar({
       })
     }
     if (what === 'json') exportProjectJson(s.snapshot())
-    if (what === 'csv') exportMetricsCsv(name, computeSystemMetrics(s.nodes, s.demand, s.calibration))
+    if (what === 'csv') exportMetricsCsv(name, computeSystemMetrics(s.nodes, s.demand, s.calibration, circuits))
     if (what === 'csv-floor')
       exportSpaghettiCsv(name, computeSpaghettiSummary(s.spaghetti, s.demand.shiftsPerDay, s.demand.daysPerYear, s.calibration))
     if (what === 'csv-bench') {
-      const rows = computeBenchmarks(computeSystemMetrics(s.nodes, s.demand, s.calibration), s.calibration)
+      const rows = computeBenchmarks(computeSystemMetrics(s.nodes, s.demand, s.calibration, circuits), s.calibration)
       exportBenchmarksCsv(name, rows, overallGrade(rows))
     }
     if (what === 'svg' || what === 'png') {

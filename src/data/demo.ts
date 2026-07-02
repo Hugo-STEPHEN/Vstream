@@ -88,7 +88,7 @@ const spaghetti: SpaghettiState = {
       points: [{ x: 640, y: 210 }, { x: 740, y: 210 }],
     },
     {
-      id: 'r3', linkedNodeId: 'p3', name: 'Weld → Assembly', mode: 'walk', tripsPerShift: 30,
+      id: 'r3', linkedNodeId: 'p3', operatorCircuit: true, purpose: 'delivery', name: 'Weld → Assembly', mode: 'walk', tripsPerShift: 30,
       points: [{ x: 860, y: 300 }, { x: 860, y: 360 }, { x: 620, y: 360 }, { x: 620, y: 420 }],
     },
     {

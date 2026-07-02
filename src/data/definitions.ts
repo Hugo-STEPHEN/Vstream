@@ -356,6 +356,17 @@ export const DEFINITIONS: NeedDefinition[] = [
   },
   {
     category: 'Spaghetti & transport',
+    term: 'Operator circuit',
+    termFr: 'Circuit opérateur',
+    formula: 'walk time/day ÷ available time/day',
+    unit: '% of available time',
+    definition:
+      'A floor route the operator must walk (to deliver production, gather info, or navigate between steps). Its travel time is charged against the linked station\u2019s available time, lowering its TRS, capacity and the whole flow.',
+    definitionFr:
+      'Un trajet que l\u2019op\u00e9rateur doit parcourir (livrer la production, chercher l\u2019info, naviguer entre \u00e9tapes). Son temps de marche est imput\u00e9 au temps disponible du poste li\u00e9, ce qui baisse son TRS, sa capacit\u00e9 et tout le flux.',
+  },
+  {
+    category: 'Spaghetti & transport',
     term: 'Best-mode ROI',
     termFr: 'ROI meilleur mode',
     definitionFr: 'Économie annuelle si chaque trajet utilisait son mode de transport viable le moins cher.',

@@ -2,7 +2,8 @@ import { useRef } from 'react'
 import { useMemo } from 'react'
 import { AlertTriangle, Gauge, ImagePlus, Info, Link2, Microscope, OctagonAlert, Trash2, X } from 'lucide-react'
 import { useApp } from '../../store'
-import { computeProcessMetrics, computeSystemMetrics, fmtSeconds, isInventoryKind, isProcessKind } from '../../lib/analytics'
+import { fmtSeconds, isInventoryKind, isProcessKind } from '../../lib/analytics'
+import { useSystemMetrics } from '../../lib/useMetrics'
 import { Badge, NumberField, Section, TextField } from '../ui'
 import { useT, type StringKey } from '../../i18n'
 import { isAnnotationKind } from '../../types'
@@ -27,7 +28,7 @@ export function Inspector() {
   const deleteSelection = useApp((s) => s.deleteSelection)
   const calibration = useApp((s) => s.calibration)
 
-  const metrics = useMemo(() => computeSystemMetrics(nodes, demand, calibration), [nodes, demand, calibration])
+  const metrics = useSystemMetrics()
   const node = nodes.find((n) => n.id === selectedNodeId)
   const edge = edges.find((e) => e.id === selectedEdgeId)
 
@@ -263,13 +264,9 @@ function AnnotationFields({ nodeId }: { nodeId: string }) {
 }
 
 function ProcessReadout({ nodeId }: { nodeId: string }) {
-  const nodes = useApp((s) => s.nodes)
-  const demand = useApp((s) => s.demand)
-  const calibration = useApp((s) => s.calibration)
-  const metrics = useMemo(() => computeSystemMetrics(nodes, demand, calibration), [nodes, demand, calibration])
-  const node = nodes.find((n) => n.id === nodeId)
-  if (!node) return null
-  const m = computeProcessMetrics(node, metrics.taktSeconds, calibration.alerts.smedFactor)
+  const metrics = useSystemMetrics()
+  const m = metrics.processes.find((p) => p.nodeId === nodeId)
+  if (!m) return null
 
   const rows: [string, string, string][] = [
     ['CT nominal', fmtSeconds(m.ctNominal), 'text-slate-200'],
